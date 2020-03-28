@@ -294,3 +294,20 @@ def describe_element(name, df):
             element.append('property ' + f + ' ' + df.columns.values[i])
 
     return element
+    
+
+def make_ply(cloud_file, label_file, ply_file):
+    """ Takes cloud and label text files and merge them in a ply file
+
+    Parameters
+    ----------
+    cloud_file: str
+    label_file: str
+    ply_folder: str
+    """
+    cloud_data = np.loadtxt(cloud_file, delimiter=' ')
+    label_data = np.loadtxt(label_file)
+    write_ply(ply_file, [cloud_data[:,:4], cloud_data[:,4:].astype(np.int32), label_data.astype(np.int32)], ['x', 'y', 'z', 'reflectance', 'red', 'green', 'blue', 'label'])
+
+    
+    
