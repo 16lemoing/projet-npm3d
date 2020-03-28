@@ -30,9 +30,6 @@ class VoxelCloud:
         if type(j) is int:
             isnum = True
             j = [j]
-            
-        # row_target = self.voxels.loc[i, :]
-        # rows_candidates = self.voxels.loc[j, :]
         
         gc_target = self.s_geometric_center[i, :]
         gc_candidates = self.s_geometric_center[j, :]
@@ -123,6 +120,15 @@ class VoxelCloud:
             # Updating indices
             indices = np.array(list(range(n_voxels)))[indices_mask]
         
+    
+    def plot_voxel_points(self, ax, i, c = None):
+        data = self.cloud.points[self.cloud.voxels[i], :]
+        ax.plot(data[:,0], data[:,1], data[:,2], '.', **({'c': c} if c is not None else {}))
         
+    def plot_voxel_geometric_center(self, ax, i, c = None):
+        data = self.s_geometric_center[[i], :]
+        ax.plot(data[:,0], data[:,1], data[:,2], '.', **({'c': c} if c is not None else {}))
+        
+    
     def __len__(self):
         return len(self.voxels)

@@ -11,7 +11,7 @@ class Cloud:
         self.points = points
         self.laser_intensity = laser_intensity
         self.rgb_colors = rgb_colors
-        self.voxels = None$
+        self.voxels = None
         self.kdt = KDTree(self.points) # Can take a few seconds to build
     
     @staticmethod
@@ -117,4 +117,7 @@ class Cloud:
                 mean_color, 
                 var_color
             ))
-        )    
+        )
+        
+    def __len__(self):
+        return len(self.points)
