@@ -26,7 +26,7 @@ def show_points(cloud, idxs, color=None):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     for i in range(len(idxs)):
-        data = cloud[idxs[i], :]
+        data = cloud.points[idxs[i], :]
         ax.plot(data[:,0], data[:,1], data[:,2], '.', **({'c': color[i]} if color is not None else {}))
     
     plt.show()
