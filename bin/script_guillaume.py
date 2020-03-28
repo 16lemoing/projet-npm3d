@@ -9,6 +9,7 @@ from sklearn.neighbors import KDTree
 from utils.ply import read_ply, write_ply
 from plots import show_points
 from descriptors import local_PCA
+import matplotlib.pyplot as plt
 
 
 
@@ -17,7 +18,44 @@ from descriptors import local_PCA
 def determine_bounding_box(points):
     return np.min(points, axis=0), np.max(points, axis=0)
     
-def voxelize_cloud(cloud, max_voxel_size = 0.3, seed = 42):
+def voxelize_big_cloud(big_cloud, sub_cloud_size = 10, max_voxel_size = 0.3, seed = 42, min_points = None):
+    """
+    Transforms a cloud into a list of list of indices
+    Each sublist of indices is a voxel, represented by the indices of its points
+    Since it is a big cloud voxels are computed on subclouds first
+    """
+    
+    # Create grid
+    min_x, max_x = np.min(big_cloud[:,0]), np.max(big_cloud[:,0])
+    min_y, max_y = np.min(big_cloud[:,1]), np.max(big_cloud[:,1])
+    grid_x = np.linspace(min_x, max_x, num=int((max_x - min_x) / sub_cloud_size) + 1)
+    grid_y = np.linspace(min_y, max_y, num=int((max_y - min_y) / sub_cloud_size) + 1)
+    big_cloud_idxes = np.array(range(len(big_cloud)))
+    
+    # For each cell of the grid extract subcloud and compute voxels
+    big_cloud_voxels = []
+    for i in range(len(grid_x) - 1):
+        cloud_min_x, cloud_max_x = grid_x[i], grid_x[i+1]
+        for j in range(len(grid_y) - 1):
+            cloud_min_y, cloud_max_y = grid_y[i], grid_y[i+1]
+            cloud_mask = ((big_cloud[:,0] >= min_x) & \
+                          (big_cloud[:,0] <= max_x) & \
+                          (big_cloud[:,1] >= min_y) & \
+                          (big_cloud[:,1] <= max_y))
+            cloud = big_cloud[cloud_mask]
+            cloud_idxes = big_cloud_idxes[cloud_mask]
+            voxels, _ = voxelize_cloud(cloud, max_voxel_size, seed, min_points)
+            for voxel in voxels:
+                big_cloud_voxels.append(cloud_idxes[voxel])
+    
+    return voxels
+            
+            
+            
+    
+    
+    
+def voxelize_cloud(cloud, max_voxel_size = 0.3, seed = 42, min_points = None):
     """
     Transforms a cloud into a list of list of indices
     Each sublist of indices is a voxel, represented by the indices of its points
@@ -54,6 +92,11 @@ def voxelize_cloud(cloud, max_voxel_size = 0.3, seed = 42):
         # These indices are not available anymore
         available_idxs_mask = available_idxs_mask & ~voxel_idxs_mask
         available_idxs = all_idxs[available_idxs_mask]
+        
+        # If not enough points in voxel ignore this voxel
+        # TODO: add the points to a stack, each will be assigned to a group of friends of another voxel when all valid voxels are computed
+        if min_points is not None and len(voxel_idxs) < min_points:
+            continue
         
         # Storing into voxel
         voxels.append(voxel_idxs)
@@ -231,6 +274,32 @@ def link_chain_voxels_fast(voxels, geometric_centers, mean_intensity, var_intens
     
     return components
     
+def classify_components(components, v_gc, v_mi, v_vi, v_s, v_n, v_mc, v_vc):
+    """
+    Assign a class for each of the component
+    (0: building, 1: road, 2: car, 3: pole, 4: tree)
+    """
+    building_color, road_color, car_color, pole_color, tree_color = class_colors
+    building_normal_thresh = 0.8
+    road_normal_thresh = 0.8
+    
+    classes = []
+    for component in components:
+        # building
+        if np.mean(np.linalg.norm(v_n[component][:,:2], axis=1)) > building_normal_thresh:
+            classes.append(0)
+            continue
+        
+        # road
+        if np.mean(v_n[component][:,3]) > road_normal_thresh:
+            classes.append(1)
+            continue
+        
+        # pole
+        
+        
+    
+    
 ## Preparing data
 
 data = read_ply("../data/bildstein_station5_xyz_intensity_rgb.ply")
@@ -258,14 +327,20 @@ write_ply('../data/bildstein_station5_xyz_intensity_rgb_extract_small.ply', [ext
 
 ## Retrieve data
 
-data = read_ply("../data/bildstein_station5_xyz_intensity_rgb_extract_small.ply")
+data = read_ply("../data/bildstein_station5_xyz_intensity_rgb_extract.ply")
 cloud = np.vstack((data['x'], data['y'], data['z'])).T
 rgb_colors = np.vstack((data['red'], data['green'], data['blue'])).T
 dlaser = data['reflectance']
 
 ## Retrieve voxels
 
-voxels, voxels_mask = voxelize_cloud(cloud)
+voxels, voxels_mask = voxelize_cloud(cloud, min_points=10)
+
+## Show num of points / voxel hist
+
+num_points = [len(voxel) for voxel in voxels]
+plt.hist(num_points, bins=100)
+plt.show()
 
 ## Compute features
 
@@ -286,6 +361,13 @@ colors = np.zeros(len(voxels))
 for i in range(len(components)):
     colors[np.array(components[i])] = np.random.random()
 show_points(cloud, voxels, colors)
+
+## Classify components
+
+class_colors = [i * 1/4 for i in range(5)]
+class_labels = ['building', 'road', 'car', 'pole', 'tree']
+classes = classify_components(components)
+show_points(cloud, voxels, colors, legend_colors=class_colors, legend_labels=class_labels)
 
 ##
 # Generating a smaller dataset for tests
