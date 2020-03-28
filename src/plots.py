@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
     
-def plot_voxels(voxelcloud, idxs = None, colors = None, only_center = False):
+def plot_voxels(voxelcloud, idxs = None, colors = None, only_voxel_center = False):
     """
     Plots some voxels from a voxel cloud
     """
@@ -25,30 +25,41 @@ def plot_voxels(voxelcloud, idxs = None, colors = None, only_center = False):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     for i in range(len(idxs)):
-        if only_center:
-            voxelcloud.plot_voxel_geometric_center(ax, idxs[i], **({'c': colors[i]} if colors is not None else {}))
+        if only_voxel_center:
+            data = voxelcloud.geometric_center[[i], :]
         else:
-            voxelcloud.plot_voxel_points(ax, idxs[i], **({'c': colors[i]} if colors is not None else {}))
+            data = voxelcloud.pointcloud.get_coordinates(voxelcloud.voxels[i])
+        
+        ax.plot(data[:,0], data[:,1], data[:,2], '.', **({'c': colors[i]} if colors is not None else {}))
     
     plt.show()
     
     
-def plot_components(list_of_components, colors = None, only_voxel_center = True):
+def plot_components(componentcloud, idxs = None, colors = None, only_voxel_center = True):
     """
-    Plots some components from a list of components objects
+    Plots some components from a component cloud
     """
     
+    if idxs is None:
+        idxs = list(range(len(componentcloud)))
+    
+    if type(idxs) is int:
+        idxs = [idxs]
+    
     if colors is not None:
-        if len(colors) != len(list_of_components):
-            raise Exception("Colors must have the same shape as the list of components")
+        if len(colors) != len(idxs):
+            raise Exception("Colors must have the same shape as idxs")
         colors = cm.jet(colors / np.max(colors))
     
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    for c in list_of_components:
+    for i in range(len(idxs)):
         if only_voxel_center:
-            c.plot_component_voxel_centers(ax, **({'c': colors[i]} if colors is not None else {}))
+            data = componentcloud.voxelcloud.geometric_center[componentcloud.components[i], :]
         else:
-            c.plot_component_points(ax, **({'c': colors[i]} if colors is not None else {}))
+            data = componentcloud.get_all_3D_points_of_component(i)
+            
+        ax.plot(data[:,0], data[:,1], data[:,2], '.', **({'c': colors[i]} if colors is not None else {}))
+    
     plt.show()
 

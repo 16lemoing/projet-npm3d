@@ -7,9 +7,9 @@ import time
 import numpy as np
 from utils.ply import read_ply, write_ply
 from plots import plot_components, plot_voxels
-from cloud import Cloud
+from pointcloud import PointCloud
 from voxelcloud import VoxelCloud
-from component import Component
+from componentcloud import ComponentCloud
 
 # %%
 ## Preparing data
@@ -37,37 +37,37 @@ from component import Component
 
 ### Test script
 
+# cloud_data = read_ply("../data/bildstein_station5_xyz_intensity_rgb.ply")
+# label_file = "../data/labels/bildstein_station5_xyz_intensity_rgb.labels"
+# points_labels = np.loadtxt(label_file)
+# cloud_data_2 = np.vstack((cloud_data['x'], cloud_data['y'], cloud_data['z'], cloud_data["red"], cloud_data["green"], cloud_data["blue"], cloud_data["reflectance"])).T
+# mask = ((cloud_data_2[:,0] > 9) & (cloud_data_2[:,0] < 17) & (cloud_data_2[:,1] > -51) & (cloud_data_2[:,1] < -31)) & (points_labels > 0)
+
+# write_ply('../data/bildstein_station5_xyz_intensity_rgb_test_extract.ply', [cloud_data_2[mask,:3], cloud_data_2[mask,-1], cloud_data_2[mask,3:6].astype(np.int32), points_labels[mask].astype(np.int32)], ['x', 'y', 'z', 'reflectance', 'red', 'green', 'blue', 'label'])
+
 # %%
 ## Retrieve data
 
-data = read_ply("../data/bildstein_station5_xyz_intensity_rgb_extract_small.ply")
+data = read_ply("../data/bildstein_station5_xyz_intensity_rgb_test_extract.ply")
 cloud = np.vstack((data['x'], data['y'], data['z'])).T
 rgb_colors = np.vstack((data['red'], data['green'], data['blue'])).T
 dlaser = data['reflectance']
 
 # %%
 ## Defining cloud and computing voxels and features
-c = Cloud(cloud, dlaser, rgb_colors)
-c.compute_voxels()
-# access with c.voxels, c.voxels_mask
-c.compute_voxels_features()
-# access with c.s_voxels
+pc = PointCloud(cloud, dlaser, rgb_colors)
 
-vc = VoxelCloud(c)
-vc.are_neighbours(1, 1)
+vc = VoxelCloud(pc)
+vc.are_neighbours(1, [1,3])
+vc.find_neighbours([1, 4677, 2920])
 
 # %%
 ## Display voxels
-v_mi = c.s_voxels.loc[:, "mean_intensity"].values[:,0]
+v_mi = vc.mean_intensity
 normalized_v_mi = (v_mi - np.min(v_mi)) / np.ptp(v_mi)
-plot_voxels(vc, colors = normalized_v_mi)
+plot_voxels(vc, colors = normalized_v_mi, only_voxel_center = False)
 
 ##
 # %% Compute components
-vc.compute_connected_components()
-
-cps = []
-for i in range(len(vc.components)):
-    cps.append(Component(vc, i))
-    
-plot_components(cps)
+cc = ComponentCloud(vc)
+plot_components(cc, only_voxel_center = False)
