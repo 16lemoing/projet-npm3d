@@ -11,7 +11,8 @@ class Cloud:
         self.points = points
         self.laser_intensity = laser_intensity
         self.rgb_colors = rgb_colors
-        self.voxels = None
+        self.voxels = None$
+        self.kdt = KDTree(self.points) # Can take a few seconds to build
     
     @staticmethod
     def determine_bounding_box(points):
@@ -23,8 +24,6 @@ class Cloud:
         Each sublist of indices is a voxel, represented by the indices of its points
         /!\ max_voxel_size is a diameter
         """
-        
-        kdt = KDTree(self.points) # Can take a few seconds to build
     
         np.random.seed(seed) # For reproducibility
         
@@ -41,7 +40,7 @@ class Cloud:
             # Picking one available index at random
             picked_idx = available_idxs[np.random.randint(0, len(available_idxs))]
             picked_point = self.points[picked_idx, :]
-            neighbours_idxs = kdt.query_radius(picked_point[None, :], r = max_voxel_size / 2)[0]
+            neighbours_idxs = self.kdt.query_radius(picked_point[None, :], r = max_voxel_size / 2)[0]
             
             # Filtering results to keep the points which have not already been selected in voxels and determining bounding box
             neighbours_idxs = neighbours_idxs[available_idxs_mask[neighbours_idxs]]
@@ -118,36 +117,4 @@ class Cloud:
                 mean_color, 
                 var_color
             ))
-        )
-        
-    def are_neighbour_voxels(self, i, j, c_D=0.25):
-        """
-        Generate a mask that tells whether one s-voxels and a group of s-voxels are neighbours or not (using the conditions from the link-chain method, cf. article)
-        i : index
-        j : index or list of indices
-        """
-        if type(j) is int:
-            j = [j]
-            
-        row_target = self.s_voxels.loc[i, :]
-        rows_candidates = self.s_voxels.loc[j, :]
-        
-        w_D = (row_target["size"] + rows_candidates["size"]) / 2
-        cond_D = np.all(abs(row_target["geometric_center"] - rows_candidates["geometric_center"]) <= w_D + c_D, axis=1)
-        
-        cond_I = np.ones(len(j), dtype=bool)
-        if self.laser_intensity is not None:
-            w_I = np.maximum(row_target["var_intensity"], rows_candidates["var_intensity"])
-            cond_I = np.all(abs(row_target["mean_intensity"] - rows_candidates["mean_intensity"]) <= 3 * np.sqrt(w_I), axis=1)
-            
-        cond_C = np.ones(len(j), dtype=bool)
-        if self.rgb_colors is not None:
-            w_C = np.maximum(row_target["var_color"], rows_candidates["var_color"])
-            cond_C = np.all(abs(row_target["mean_color"] - rows_candidates["mean_color"]) <= 3 * np.sqrt(w_C), axis=1)
-        
-        cond = cond_D & cond_I & cond_C
-        if cond.shape == (1,):
-            return cond.values[0]
-        
-        return cond
-        
+        )    
