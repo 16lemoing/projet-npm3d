@@ -2,11 +2,11 @@
 
 import numpy as np
 from sklearn.neighbors import KDTree
-from descriptors import local_PCA
+from descriptors import local_PCA, features_from_PCA
 
 
 class VoxelCloud:
-    def __init__(self, pointcloud, max_voxel_size = 0.3, c_D = 0.25, min_voxel_length = 4, threshold_grow = 1.5, seed = 42):
+    def __init__(self, pointcloud, max_voxel_size = 0.3, min_voxel_length = 4, threshold_grow = 1.5, seed = 42):
         """
         Builds a voxel cloud from a point cloud
 
@@ -16,9 +16,6 @@ class VoxelCloud:
         max_voxel_size : float, optional
             Maximum size of the bounding box of the voxel (may be exceeded when 
             reassociating small voxels to bigger ones). The default is 0.3.
-        c_D : float, optional
-            Constant used when computing the voxel neighbours, in order to correct
-            the geometric distance. The default is 0.25.
         min_voxel_length : int, optional
             Voxels under this size will be reassociated to bigger ones. The default is 4.
         threshold_grow : float, optional
@@ -41,10 +38,13 @@ class VoxelCloud:
         self.var_intensity = np.nan * np.ones(nb_voxels)
         self.mean_color = np.nan * np.ones((nb_voxels, 3))
         self.var_color = np.nan * np.ones((nb_voxels, 3))
+        self.verticality = np.nan * np.ones(nb_voxels)
+        self.linearity = np.nan * np.ones(nb_voxels)
+        self.planarity = np.nan * np.ones(nb_voxels)
+        self.sphericity = np.nan * np.ones(nb_voxels)
         self.compute_features()
         
         self.kdt = KDTree(self.geometric_center)
-        self.c_D = c_D
     
     def has_laser_intensity(self):
         """ Tells whether this voxel cloud has laser intensity information """
@@ -109,7 +109,6 @@ class VoxelCloud:
             gc2[i] = (vmin + vmax) / 2
             
         # Now we associate small voxels to bigger ones if we can if they are not too far when compared to the size if the big voxel
-        self.unassociated = []
         kdtv1 = KDTree(gc1)
         dist, nnidx = kdtv1.query(gc2)
         dist, nnidx = dist.T[0], nnidx.T[0]
@@ -138,8 +137,9 @@ class VoxelCloud:
             if self.has_color():
                 self.mean_color[i] = self.pointcloud.get_color(self.voxels[i]).mean(axis = 0)
                 self.var_color[i] = self.pointcloud.get_color(self.voxels[i]).var(axis = 0)
+            self.verticality[i], self.linearity[i], self.planarity[i], self.sphericity[i] = features_from_PCA(eigval, eigvec)
     
-    def are_neighbours(self, i, j):
+    def are_neighbours(self, i, j, c_D = 0.25):
         """
         Generate a mask that tells whether one s-voxels and a group of s-voxels are neighbours or not (using the conditions from the link-chain method, cf. article)
         i : index
@@ -164,8 +164,17 @@ class VoxelCloud:
         mc_target = self.mean_color[i, :]
         mc_candidates = self.mean_color[j, :]
         
+        norm_target = self.normal[i, :]
+        norm_candidates = self.normal[j, :]
+        plan_target = self.planarity[i]
+        plan_candidates = self.planarity[j]
+        lin_target = self.linearity[i]
+        lin_candidates = self.linearity[j]
+        sph_target = self.sphericity[i]
+        sph_candidates = self.sphericity[j]
+        
         w_D = (size_target + size_candidates) / 2
-        cond_D = np.all(abs(gc_target - gc_candidates) <= w_D + self.c_D, axis=1)
+        cond_D = np.all(abs(gc_target - gc_candidates) <= w_D + c_D, axis=1)
         
         cond_I = np.ones(len(j), dtype=bool)
         if self.has_laser_intensity() is not None:
@@ -177,21 +186,23 @@ class VoxelCloud:
             w_C = np.maximum(vc_target, vc_candidates)
             cond_C = np.all(abs(mc_target - mc_candidates) <= 3 * np.sqrt(w_C), axis=1)
         
+        #cond_N = (abs(plan_target - plan_candidates) < 0.01) | (abs(lin_target - lin_candidates) < 0.01) | (abs(sph_target - sph_candidates) < 0.01) | (abs(np.sum(norm_target * norm_candidates, axis=1)) > 0.95)
+        
         cond = cond_D & cond_I & cond_C
         if isnum:
             return cond[0]
         
         return cond
     
-    def find_spatial_neighbours(self, idxs):
+    def find_spatial_neighbours(self, idxs, c_D):
         """ Returns a list of indices of potential neighbouring voxels """
         max_size = np.max(self.size)
         if type(idxs) is int:
-            return self.kdt.query_radius(self.geometric_center[[idxs], :], r = max_size + self.c_D)[0]
-        return self.kdt.query_radius(self.geometric_center[idxs, :], r = max_size + self.c_D)
+            return self.kdt.query_radius(self.geometric_center[[idxs], :], r = max_size + c_D)[0]
+        return self.kdt.query_radius(self.geometric_center[idxs, :], r = max_size + c_D)
         
     
-    def find_neighbours(self, idxs):
+    def find_neighbours(self, idxs, c_D):
         """ Returns a list of all indices who are truly neighbours of each index in idxs """
         
         isnum = False
@@ -200,9 +211,9 @@ class VoxelCloud:
             idxs = [idxs]
         
         neighbours = []
-        potential = self.find_spatial_neighbours(idxs)
+        potential = self.find_spatial_neighbours(idxs, c_D)
         for i in range(len(idxs)):
-            neighbours.append(potential[i][self.are_neighbours(idxs[i], potential[i])])
+            neighbours.append(potential[i][self.are_neighbours(idxs[i], potential[i], c_D)])
             
         if isnum:
             return neighbours[0]

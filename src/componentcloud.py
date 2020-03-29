@@ -9,8 +9,21 @@ import numpy as np
 
 class ComponentCloud:
     
-    def __init__(self, voxelcloud):
+    def __init__(self, voxelcloud, c_D = 0.25):
+        """
+        Builds a cloud of connected component from a voxel cloud
+
+        Parameters
+        ----------
+        voxelcloud : VoxelCloud object
+        c_D : float, optional
+            Constant used when computing the voxel neighbours, in order to correct
+            the geometric distance. The default is 0.25.
+
+        """
+                
         self.voxelcloud = voxelcloud
+        self.c_D = c_D
         
         self.components = [] # This is a list of list of indices (each index is the #id of a voxel in voxelcloud)
         self.compute_connected_components() # Fills self.components
@@ -29,7 +42,7 @@ class ComponentCloud:
         """
         
         n_voxels = len(self.voxelcloud)
-        voxel_neighbours = self.voxelcloud.find_neighbours(list(range(n_voxels)))
+        voxel_neighbours = self.voxelcloud.find_neighbours(list(range(n_voxels)), self.c_D)
         
         # Explore connected components
         self.components = []
