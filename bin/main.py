@@ -6,7 +6,7 @@ sys.path.append("../src")
 import time
 import numpy as np
 from utils.ply import read_ply, write_ply
-from plots import plot_components, plot_voxels
+from plots import plot
 from pointcloud import PointCloud
 from voxelcloud import VoxelCloud
 from componentcloud import ComponentCloud
@@ -48,7 +48,7 @@ from componentcloud import ComponentCloud
 # %%
 ## Retrieve data
 
-data = read_ply("../data/bildstein_station5_xyz_intensity_rgb_test_extract.ply")
+data = read_ply("../data/bildstein_station5_xyz_intensity_rgb_test.ply")
 cloud = np.vstack((data['x'], data['y'], data['z'])).T
 rgb_colors = np.vstack((data['red'], data['green'], data['blue'])).T
 dlaser = data['reflectance']
@@ -56,18 +56,17 @@ dlaser = data['reflectance']
 # %%
 ## Defining cloud and computing voxels and features
 pc = PointCloud(cloud, dlaser, rgb_colors)
-
-vc = VoxelCloud(pc)
-vc.are_neighbours(1, [1,3])
-vc.find_neighbours([1, 4677, 2920])
+vc = VoxelCloud(pc, max_voxel_size = 0.3, c_D = 0.25, threshold_grow = 2, min_voxel_length = 4)
+plot(vc, colors = vc.mean_color, only_voxel_center = True)
+#vc.are_neighbours(1, [1,3])
+#vc.find_neighbours([1, 4677, 2920])
 
 # %%
 ## Display voxels
-v_mi = vc.mean_intensity
-normalized_v_mi = (v_mi - np.min(v_mi)) / np.ptp(v_mi)
-plot_voxels(vc, colors = normalized_v_mi, only_voxel_center = False)
+plot(vc, colors = vc.mean_intensity, only_voxel_center = False, also_unassociated_points = True)
+plot(vc, colors = vc.mean_color, only_voxel_center = False, also_unassociated_points = False)
 
 ##
-# %% Compute components
+# %% Compute components and display them
 cc = ComponentCloud(vc)
-plot_components(cc, only_voxel_center = False)
+plot(cc, colors = cc.mean_intensity, only_voxel_center = False, also_unassociated_points = False)
