@@ -332,9 +332,9 @@ class VoxelCloud:
     
     def has_label(self):
         """
-            Tells whether this voxel cloud has RGB color information
+            Tells whether this voxel cloud has label information
         """
-        return self.pointcloud.has_color()
+        return self.pointcloud.has_label()
     
     def __len__(self):
         return len(self.voxels)
