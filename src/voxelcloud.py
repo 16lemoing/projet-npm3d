@@ -3,10 +3,11 @@
 import numpy as np
 from sklearn.neighbors import KDTree
 from descriptors import local_PCA, features_from_PCA
+import time
 
 
 class VoxelCloud:
-    def __init__(self, pointcloud, max_voxel_size = 0.3, min_voxel_length = 4, threshold_grow = 1.5, seed = 42):
+    def __init__(self, pointcloud, max_voxel_size = 0.3, min_voxel_length = 4, threshold_grow = 1.5, method = "regular", seed = 42):
         """
         Builds a voxel cloud from a point cloud
 
@@ -26,7 +27,12 @@ class VoxelCloud:
             For reproducibility. The default is 42.
         """
         self.pointcloud = pointcloud
-        self.compute_voxels(max_voxel_size, min_voxel_length, threshold_grow, seed)
+        if method == "regular":
+            self.compute_voxels_v2(max_voxel_size, min_voxel_length)
+        else:
+            self.compute_voxels(max_voxel_size, min_voxel_length, seed)
+        
+        self.postprocess_small_voxels(threshold_grow)
         
         nb_voxels = len(self)
         self.nb_points = np.zeros(nb_voxels)
@@ -54,7 +60,51 @@ class VoxelCloud:
         """ Tells whether this voxel cloud has RGB color information """
         return self.pointcloud.has_color()
     
-    def compute_voxels(self, max_voxel_size, min_voxel_length, threshold_grow, seed = 42):
+    def compute_voxels_v2(self, max_voxel_size, min_voxel_length):
+        # Regular grid
+        # TODO max_voxel_size dépendant de la direction ? 3x1 ?
+        pts = self.pointcloud.get_coordinates()
+        mini = np.min(pts, axis = 0)
+        maxi = np.max(pts, axis = 0)
+        
+        centers = []
+        # Iraitement des z les uns après les autres pour éviter de remplir la RAM
+        for z in np.arange(mini[2] + max_voxel_size / 2, maxi[2], max_voxel_size):
+            print(f"z={z}")
+            centers_xy = np.stack(np.meshgrid(np.arange(mini[0] + max_voxel_size / 2, maxi[0], max_voxel_size), np.arange(mini[1] + max_voxel_size / 2, maxi[1], max_voxel_size)), axis=2).reshape((-1,2))
+            centers_z = np.hstack((centers_xy, z * np.ones((len(centers_xy), 1))))
+            
+            counts_z = self.pointcloud.kdt.query_radius(centers_z, r = np.sqrt(3 * max_voxel_size ** 2), count_only = True)
+            centers_z = centers_z[counts_z != 0]
+            centers.append(centers_z)
+        
+        centers = np.vstack(centers)
+        
+        t0 = time.time()
+        kdtc = KDTree(centers)
+        t1 = time.time()
+        print(f"KDTree built on centers in {t1 - t0:.2f}s")
+        
+        dist, ctr = kdtc.query(pts, k = 1)
+        dist, ctr = dist.T[0], ctr.T[0]
+        ctrunique = np.unique(ctr)
+        
+        t2 = time.time()
+        print(f"Finished computing voxel association in {t2-t1:.2f}s")
+        
+        self.voxels = []
+        self.too_small_voxels = []
+        
+        modulo = len(ctrunique) // 100
+        for i in range(len(ctrunique)):
+            if i % modulo == 0:
+                print(f"{100*i / len(ctrunique):.1f}%")
+            voxel_idxs = np.where(ctr == ctrunique[i])[0]
+            (self.voxels if len(voxel_idxs) >= min_voxel_length else self.too_small_voxels).append(voxel_idxs)
+        
+        #raise Exception()
+    
+    def compute_voxels(self, max_voxel_size, min_voxel_length, seed = 42):
         """
         Transforms the point cloud into a list of list of indices
         Each sublist of indices is a voxel, represented by the indices of its points
@@ -93,7 +143,8 @@ class VoxelCloud:
             
             # Storing into voxels
             (self.voxels if len(voxel_idxs) >= min_voxel_length else self.too_small_voxels).append(voxel_idxs)
-            
+        
+    def postprocess_small_voxels(self, threshold_grow):
         # Postprocessing voxels : computes size and geometric centers of voxels at this step before small voxels management 
         gc1 = np.ones((len(self.voxels), 3))
         gc2 = np.ones((len(self.too_small_voxels), 3))
