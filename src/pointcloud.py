@@ -2,6 +2,7 @@
 
 from sklearn.neighbors import KDTree
 import numpy as np
+import time
 
 class PointCloud:
     
@@ -9,7 +10,9 @@ class PointCloud:
         self.points = points
         self.laser_intensity = laser_intensity
         self.rgb_colors = rgb_colors
+        t0 = time.time()
         self.kdt = KDTree(self.points) # Can take a few seconds to build
+        print(f"KDTree build for point cloud in {time.time() - t0:.2f} seconds")
     
     def get_coordinates(self, idxs = None):
         """
