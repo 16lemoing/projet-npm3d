@@ -1,4 +1,4 @@
-\documentclass[a4paper, onecolumn, 11pt]{report}
+\documentclass[a4paper, onecolumn, 11pt]{article}
 \usepackage[french]{babel}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -14,9 +14,10 @@
 \usepackage{float}
 \usepackage{listings}
 \usepackage{wrapfig}
-\usepackage{breakurl}
 \usepackage{hyperref}
+\usepackage{breakurl}
 \usepackage{python}
+\usepackage{xcolor}
 \usepackage[toc,page]{appendix}
 \geometry{hmargin=2cm,vmargin=2.5cm}
 \usepackage{fancyhdr}
@@ -37,11 +38,105 @@
 \author{Guillaume LE MOING, Hugues SOUCHARD DE LAVOREILLE}
 \date{\vspace{12cm} Mars 2020}
 
+\newcommand{\TODO}{\fbox{\textcolor{red}{TODO}}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\V}{\mathcal{V}}
+
 \begin{document}
 
 \maketitle
 
-%\tableofcontents
+\tableofcontents
 
+\section{Introduction et définition du problème}
+Le développement de systèmes de localisation en temps réel pour les véhicules autonomes ou encore d'inspection automatique de grandes structures industrielles font aujourd'hui pour certaines appel à l'acquisition et au traitement de nuages de points 3D de grande taille : on cherche en général à détecter des objets puis à déterminer leur nature, donc à segmenter le nuage en objets que l'on classifie ensuite. Ce traitement de ces très grandes données se heurte à des difficultés liées au temps de calcul. C'est dans ce cadre que l'article \cite{aka_article} – complété et enrichi par \cite{aka_thesis} – propose une approche regroupant les nombreux points du nuage en voxels. C'est directement sur ces voxels, moins nombreux que les points et possédant plus d'information, que sont effectuées les coûteuses opérations de calcul de voisinage, de segmentation et de classification d'objets.
+
+Nous proposons dans ce document une analyse synthétique critique de la méthode ainsi que quelques pistes d'amélioration que nous avons explorées durant notre travail.
+
+\section{Une nouvelle représentation plus parcimonieuse des nuages de points}
+\subsection{Voxels et propriétés locales du nuage}
+Le cœur de la méthode proposée repose sur une nouvelle représentation du nuage de points initialement acquis sous forme d'un nuage de voxels. On définit un voxel comme étant un ensemble de points 3D spatialement proches. En fonction de ce que \og proche \fg\ signifie, un voxel pourra contenir entre 5 à 100 points les uns des autres : si le nuage de points est dense, il est probable que les points soient redondants et qu'ils aient localement les mêmes propriétés (même couleur, même intensité de réflectance laser, ...) et leur fusion dans un seul voxel permet de diminuer considérablement la taille de la représentation. Si le nuage est peu dense à un autre endroit, un voxel comportera peu de points 3D mais \emph{pèsera} autant qu'un voxel issu d'une zone plus dense lors de l'analyse de la scène. Ceci permet de rectifier les inhomogénéités de densité dues à l'acquisition.
+
+Par ailleurs, un voxel est par définition un ensemble de points spatialement proches : cette caractéristique permet de calculer des propriétés pour chaque voxel en combinant les propriétés de chacun de ses points composants. Il est par exemple possible de calculer la couleur moyenne des points, la variance de celle-ci, un vecteur normal par analyse des composantes principales lorsque le voxel possède au moins 3 points, etc. À une taille de voxel donnée, ces propriétés seront souvent plus robustes que les propriétés équivalentes de chaque point composant : la couleur moyenne est par exemple un bon estimateur de la couleur à cet endroit de l'espace ; elle filtre les éventuelles valeurs aberrantes \emph{outliers} qui auraient pu être présentes sur les points. De même, le vecteur normal d'un plan sera plus stable dès lors que l'on aura un nombre suffisant de points définissant le plan dans le voxel.
+
+\subsection{Algorithme de transformation du nuage en nuage de voxels}
+\label{partie-algo-voxels}
+La première étape du traitement du nuage de points est donc sa transformation en un nuage de voxels. Celle-ci a été implémentée dans le constructeur de la classe \texttt{VoxelCloud} du code Python proposé. Elle repose sur la première étape de l'algorithme 1 (page 1629) de \cite{aka_article} que nous détaillons dans la suite en l'enrichissant de clarifications utiles.
+
+\TODO Définir $r$ : taille maximal de voxel / 2
+
+On procède avec l'heuristique suivante :
+\begin{enumerate}
+	\item On commence par construire un \emph{arbre kd} des coordonnées du nuage de points ;
+	\item On sélectionne un point au hasard dans le nuage et on détermine son $r$-voisinage grâce à l'\emph{arbre kd}. On appelle $\mathcal{W}$ l'ensemble des points de ce voisinage qui n'ont pas déjà été inclus dans un voxel ;
+	\item On détermine la plus petite boîte parallélépipédique $\mathcal{B}$ englobant les points de $\mathcal{W}$ ;
+	\item On définit un nouveau voxel $\V$ en sélectionnant tous les points du nuage qui sont contenus dans $\mathcal{B}$ et qui n'ont pas encore été inclus dans un autre voxel.
+	\item On retourne au point 2 jusqu'à ce qu'il n'y ait plus de points à sélectionner.
+\end{enumerate}
+
+Cet algorithme a l'inconvénient de sélectionner les centres des voxels au hasard : il est possible qu'il décide de prendre un point se trouvant juste à côté de deux voxels déjà sélectionnés. \textcolor{red}{Cette étape n'est pas à rédiger pour le moment car il est encore possible qu'elle change}. \TODO
+On pourrait soit échantillonner sur une grille régulière, soit regarder s'il y a un voxel pas loin quand on commence avec un nouveau point, soit faire un post-traitement.
+
+\subsection{Calcul des caractéristiques des voxels}
+Une fois les points composant chaque voxel déterminés, il est possible de calculer les caractéristiques locales en associant à chaque voxel $\V$:
+
+\begin{itemize}
+\item son centre géométrique $\overrightarrow{p_\V}$ (que l'on suppose être le point au milieu de la boîte parallélépipédique définie au point 3 de la la partie \ref{partie-algo-voxels}) et sa taille $\overrightarrow{s_\V}$ (taille de la boîte $\mathcal{B}$ dans les 3 dimensions spatiales);
+\item sa couleur, définie par la moyenne $\overrightarrow{\mu_\V^c}$ et l'écart-type $\overrightarrow{\sigma_\V^c}$ locaux de chaque canal de la couleur RVB des points constitutifs de $\mathcal{V}$ ;
+\item son intensité de réflectance laser, définie par la moyenne $\mu_\V^i$ et l'écart-type $\sigma_\V^i$ locaux de l'intensité de réflectance laser des points constitutifs de $\mathcal{V}$ ;
+\item son vecteur normal $\overrightarrow{n_\V}$, déterminé par analyse des composantes principales de tous les points constitutifs de $\mathcal{V}$
+\end{itemize}
+
+On a noté avec des flèches $\overrightarrow{\cdot}$ les quantités vectorielles, sur lesquelles on sera amené par la suite à effectuer des opérations (comparaison, somme, ...) terme à terme.
+
+Il est bien entendu possible de calculer d'autres caractéristiques (\textcolor{red}{c'est d'ailleurs en tests}) \TODO
+
+\section{Voisinage dans l'espace des voxels et segmentation}
+On propose dans cette partie une nouvelle lecture de la méthode \emph{link-chain} proposée dans \cite{aka_article} en l'interprétant comme la détection de composantes connexes dans un graphe dont les arêtes dont définies par une nouvelle relation de voisinage mélangeant informations spatiale et colorimétrique.
+
+\subsection{Condition de voisinage}
+On se place dans l'ensemble $\mathcal{Z} = \{\mathcal{V}\}$ des voxels que l'on munit d'une relation de voisinage grâce aux caractéristiques des voxels calculées précédemment.
+
+Soit $A, B \in \mathcal{Z}$ deux voxels et $c_D > 0$. On dit que $A$ et $B$ sont $c_D$-voisins, et on note $A \sim_{c_D} B$ si :
+
+\begin{align}
+\left|\overrightarrow{p_A} - \overrightarrow{p_B}\right| &\leq c_D\overrightarrow{1} + \frac{1}{2} \left(\overrightarrow{s_A} + \overrightarrow{s_B}\right)\\
+\left|\overrightarrow{\mu_A^c} - \overrightarrow{\mu_B^c}\right| &\leq 3 \max\left(\overrightarrow{\sigma_A^c}, \overrightarrow{\sigma_B^c}\right)\\
+\left|\mu_A^i - \mu_B^i\right| &\leq 3 \max\left(\sigma_A^i, \sigma_B^i\right)
+\end{align}
+
+
+\TODO Ajouter un paragraphe sur l'interprétation des conditions dans la relation d'équivalence (pourquoi somme des tailles, pourquoi facteur $c_D$ [sur ce point, revoir l'article], etc)
+
+\TODO L'article dit que les normales ne sont pas considérées ici pour travailler directement sur les entités plutôt que sur les surfaces planes. Le mentionner ?
+
+On remarque immédiatement que cette relation est symétrique : $A \sim_{c_D} B \Leftrightarrow B \sim_{c_D} A$. On peut alors munir notre ensemble $\mathcal{Z}$ d'arêtes pour former un graphe non-orienté dont on détermine ensuite les composantes connexes.
+
+\subsection{Recherche des composantes connexes}
+La recherche des composantes connexes pourrait se faire de façon naïve en $\mathcal{O}(|\mathcal{Z}|^2)$ en parcourant l'ensemble $\mathcal{Z}$ pour chaque voxel et en vérifiant s'ils vérifient ou non la condition de voisinage. Toutefois, on peut considérablement alléger les calculs en restreignant la vérification de la condition aux points spatialement proches et en utilisant un \emph{arbre kd}.
+
+\section{Données, résultats et conclusion}
+\subsection{Implémentation}
+L'implémentation de la méthode a été réalisée en Python. Elle est disponible à l'adresse suivante :
+
+\begin{center}
+	\url{https://github.com/h-sdl/projet-npm3d/} 
+\end{center}
+
+Cette implémentation reprend quelques éléments du code de Hugues Thomas\footnote{\url{mailto:huguesthomas218@gmail.com}} pour ce qui concerne le chargement et l'écriture de fichiers \texttt{.ply} représentant les nuages de points.
+
+\subsection{Données}
+Les données mentionnées en 2013 dans l'article \cite{aka_article} n'étant plus disponibles en ligne en 2020, nous avons travaillé sur le jeu de données \texttt{reduced-8} de \href{http://www.semantic3d.net/}{\emph{Semantic3D}} \cite{hackel2017isprs}. Celles-ci ont l'avantage de comporter non seulement les données d'intensité de réflectance laser mais aussi de couleur RGB de chaque point, en plus d'être partiellement classifiées. Ce dernier point nous a permis de mettre en place une méthode de classification par apprentissage.
+Nous avons réalisé nos expérimentations sur une version réduite du nuage \texttt{bildstein5} avant d'apprendre (\TODO en fonction de ce qui sera fait).
+Une représentation de ce nuage est présentée à la figure \ref{tomate}.
+
+\begin{figure}[h]
+\caption{Nuage de points \texttt{bildstein5} du jeu de données \emph{Semantic3D}}
+\label{tomate}
+\end{figure}
+
+\nocite{*}
+\bibliographystyle{plain}
+\bibliography{biblio}
 
 \end{document}
