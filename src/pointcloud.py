@@ -6,13 +6,15 @@ import time
 
 class PointCloud:
     
-    def __init__(self, points, laser_intensity = None, rgb_colors = None):
+    def __init__(self, points, laser_intensity = None, rgb_colors = None, label = None):
         self.points = points
         self.laser_intensity = laser_intensity
         self.rgb_colors = rgb_colors
+        self.label = label
         t0 = time.time()
         self.kdt = KDTree(self.points) # Can take a few seconds to build
-        print(f"KDTree build for point cloud in {time.time() - t0:.2f} seconds")
+        t1 = time.time()
+        print(f"KDTree build for point cloud in {t1 - t0:.2f} seconds")
     
     def get_coordinates(self, idxs = None):
         """
@@ -39,6 +41,23 @@ class PointCloud:
             return self.laser_intensity
         else:
             return self.laser_intensity[idxs]
+    
+    def has_label(self):
+        """
+        Tells whether the point cloud has labels
+        """
+        return self.label is not None
+    
+    def get_label(self, idxs = None):
+        """
+        Returns a N-numpy array containing the labels of the indexes given as inputs
+        """
+        if self.label is None:
+            return np.nan * (1 if type(idxs) is int else (np.ones(len(idxs) if idxs is not None else len(self))))
+        if idxs is None:
+            return self.label
+        else:
+            return self.label[idxs]
     
     def has_color(self):
         """
