@@ -6,6 +6,7 @@ Created on Sat Mar 28 16:16:52 2020
 """
 
 import numpy as np
+from descriptors import local_PCA
 
 class ComponentCloud:
     
@@ -31,8 +32,22 @@ class ComponentCloud:
         
         # Initializes and declares features
         self.barycenter = np.ones((len(self), 3))
+        self.geometrical_center = np.ones((len(self), 3))
+        self.mean_znormal = np.ones(len(self))
+        self.var_znormal = np.ones(len(self))
+        self.mean_xynormal = np.ones(len(self))
+        self.var_xynormal = np.ones(len(self))
         self.mean_intensity = np.nan * np.ones(len(self))
+        self.var_intensity = np.nan * np.ones(len(self))
         self.mean_color = np.nan * np.ones((len(self), 3))
+        self.var_color = np.nan * np.ones((len(self), 3))
+        self.pca_val = np.ones((len(self), 3))
+        self.pca_vec = np.ones((len(self), 9))
+        self.size = np.ones((len(self), 3))
+        self.mean_verticality = np.ones(len(self))
+        self.mean_linearity = np.ones(len(self))
+        self.mean_planarity = np.ones(len(self))
+        self.mean_sphericity = np.ones(len(self))
         self.compute_features() # Computes features
         
         
@@ -75,11 +90,38 @@ class ComponentCloud:
             vx_colors = self.voxelcloud.mean_color[self.components[i]]
             vx_intensities = self.voxelcloud.mean_intensity[self.components[i]]
             vx_nb_points = self.voxelcloud.nb_points[self.components[i]]
+            vx_geometric_centers = self.voxelcloud.geometric_center[self.components[i]]
+            vx_sizes = self.voxelcloud.size[self.components[i]]
+            vx_normals = self.voxelcloud.normal[self.components[i]]
+            vx_verticalities = self.voxelcloud.verticality[self.components[i]]
+            vx_linerities = self.voxelcloud.linearity[self.components[i]]
+            vx_planarities = self.voxelcloud.planarity[self.components[i]]
+            vx_sphericities = self.voxelcloud.sphericity[self.components[i]]
             
             self.barycenter[i, :] = np.sum(vx_barycenters * vx_nb_points[:, None], axis=0) / np.sum(vx_nb_points)
+            p_max = np.max(vx_geometric_centers + vx_sizes / 2, axis=0)
+            p_min = np.min(vx_geometric_centers + vx_sizes / 2, axis=0)
+            self.geometrical_center[i, :] = (p_max + p_min) / 2
+            self.size[i, :] = p_max - p_min
             self.mean_color[i, :] = np.sum(vx_colors * vx_nb_points[:, None], axis = 0) / np.sum(vx_nb_points)
+            self.var_color[i, :] = np.sum((vx_colors - self.mean_color[i, :]) ** 2 * vx_nb_points[:, None], axis = 0) / np.sum(vx_nb_points)
             self.mean_intensity[i] = np.sum(vx_intensities * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
-        
+            self.var_intensity[i] = np.sum((vx_intensities - self.mean_intensity[i, :]) ** 2 * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
+            self.mean_znormal[i] = np.sum(vx_normals[:, 2] * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
+            self.var_znormal[i] = np.sum((vx_normals[:, 2] - self.mean_znormal[i]) ** 2 * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
+            self.mean_xynormal[i] = np.sum(np.linalg.norm(vx_normals[:, :2], axis = 1) * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
+            self.var_xynormal[i] = np.sum((np.linalg.norm(vx_normals[:, :2], axis = 1) - self.mean_xynormal[i]) ** 2 * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
+            eigval, eigvec = local_PCA(vx_geometric_centers)
+            self.pca_val[i, :] = eigval
+            self.pca_vec[i, :] = eigvec.flatten()
+            self.mean_verticality[i] = np.sum(vx_verticalities * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
+            self.mean_linearity[i] = np.sum(vx_linerities * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
+            self.mean_planarity[i] = np.sum(vx_planarities * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
+            self.mean_sphericity[i] = np.sum(vx_sphericities * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
+
+
+    def get_features(self):
+        #TODO: stack all features
     
     def get_all_3D_points_of_component(self, i):
         points = []
