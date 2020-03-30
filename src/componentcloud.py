@@ -106,7 +106,7 @@ class ComponentCloud:
             self.mean_color[i, :] = np.sum(vx_colors * vx_nb_points[:, None], axis = 0) / np.sum(vx_nb_points)
             self.var_color[i, :] = np.sum((vx_colors - self.mean_color[i, :]) ** 2 * vx_nb_points[:, None], axis = 0) / np.sum(vx_nb_points)
             self.mean_intensity[i] = np.sum(vx_intensities * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
-            self.var_intensity[i] = np.sum((vx_intensities - self.mean_intensity[i, :]) ** 2 * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
+            self.var_intensity[i] = np.sum((vx_intensities - self.mean_intensity[i]) ** 2 * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
             self.mean_znormal[i] = np.sum(vx_normals[:, 2] * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
             self.var_znormal[i] = np.sum((vx_normals[:, 2] - self.mean_znormal[i]) ** 2 * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
             self.mean_xynormal[i] = np.sum(np.linalg.norm(vx_normals[:, :2], axis = 1) * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
@@ -122,6 +122,7 @@ class ComponentCloud:
 
     def get_features(self):
         #TODO: stack all features
+        return 0
     
     def get_all_3D_points_of_component(self, i):
         points = []
