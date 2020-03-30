@@ -9,31 +9,33 @@ import time
 class VoxelCloud:
     def __init__(self, pointcloud, max_voxel_size = 0.3, min_voxel_length = 4, threshold_grow = 1.5, method = "regular", seed = 42):
         """
-        Builds a voxel cloud from a point cloud
-
-        Parameters
-        ----------
-        pointcloud : PointCloud object
-        max_voxel_size : float, optional
-            Maximum size of the bounding box of the voxel (may be exceeded when 
-            reassociating small voxels to bigger ones). The default is 0.3.
-        min_voxel_length : int, optional
-            Voxels under this size will be reassociated to bigger ones. The default is 4.
-        threshold_grow : float, optional
-            Small voxels under min_voxel_length will be associated to the closest bigger
-            one if their distance is smaller than threshold_grow * big_voxel_size. The default is 1.5,
-            which means that big voxels may grow of 50%
-        seed : TYPE, optional
-            For reproducibility. The default is 42.
+            Builds a voxel cloud from a PointCloud object
+    
+            Parameters
+            ----------
+            pointcloud : PointCloud object
+            max_voxel_size : float, optional
+                Maximum size of the bounding box of the voxel (may be exceeded when 
+                reassociating small voxels to bigger ones). The default is 0.3.
+            min_voxel_length : int, optional
+                Voxels under this size will be reassociated to bigger ones. The default is 4.
+            threshold_grow : float, optional
+                Small voxels under min_voxel_length will be associated to the closest bigger
+                one if their distance is smaller than threshold_grow * big_voxel_size. The default is 1.5,
+                which means that big voxels may grow of 50%
+            seed : TYPE, optional
+                For reproducibility. The default is 42.
         """
         self.pointcloud = pointcloud
         if method == "regular":
-            self.compute_voxels_v2(max_voxel_size, min_voxel_length)
+            self.compute_voxels_regular_grid(max_voxel_size, min_voxel_length)
         else:
             self.compute_voxels(max_voxel_size, min_voxel_length, seed)
         
+        # Now removes voxels whose size is under min_voxel_length
         self.postprocess_small_voxels(threshold_grow)
         
+        # Initializes features
         nb_voxels = len(self)
         self.nb_points = np.zeros(nb_voxels)
         self.geometric_center = np.zeros((nb_voxels, 3))
@@ -48,20 +50,17 @@ class VoxelCloud:
         self.linearity = np.nan * np.ones(nb_voxels)
         self.planarity = np.nan * np.ones(nb_voxels)
         self.sphericity = np.nan * np.ones(nb_voxels)
+        self.majority_label = np.nan * np.ones(nb_voxels)
+        self.certainty_label = np.nan * np.ones(nb_voxels)
         self.compute_features()
         
+        # Initializes a kd-tree with geometric centers for further searches
         self.kdt = KDTree(self.geometric_center)
     
-    def has_laser_intensity(self):
-        """ Tells whether this voxel cloud has laser intensity information """
-        return self.pointcloud.has_laser_intensity()
-    
-    def has_color(self):
-        """ Tells whether this voxel cloud has RGB color information """
-        return self.pointcloud.has_color()
-    
-    def compute_voxels_v2(self, max_voxel_size, min_voxel_length):
-        # Regular grid
+    def compute_voxels_regular_grid(self, max_voxel_size, min_voxel_length):
+        """
+            Computes the voxels by regularly sampling the point space
+        """
         # TODO max_voxel_size dépendant de la direction ? 3x1 ?
         pts = self.pointcloud.get_coordinates()
         mini = np.min(pts, axis = 0)
@@ -70,7 +69,7 @@ class VoxelCloud:
         centers = []
         # Iraitement des z les uns après les autres pour éviter de remplir la RAM
         for z in np.arange(mini[2] + max_voxel_size / 2, maxi[2], max_voxel_size):
-            print(f"z={z}")
+            print(f"z={z:.2f}")
             centers_xy = np.stack(np.meshgrid(np.arange(mini[0] + max_voxel_size / 2, maxi[0], max_voxel_size), np.arange(mini[1] + max_voxel_size / 2, maxi[1], max_voxel_size)), axis=2).reshape((-1,2))
             centers_z = np.hstack((centers_xy, z * np.ones((len(centers_xy), 1))))
             
@@ -102,13 +101,12 @@ class VoxelCloud:
             voxel_idxs = np.where(ctr == ctrunique[i])[0]
             (self.voxels if len(voxel_idxs) >= min_voxel_length else self.too_small_voxels).append(voxel_idxs)
         
-        #raise Exception()
     
     def compute_voxels(self, max_voxel_size, min_voxel_length, seed = 42):
         """
-        Transforms the point cloud into a list of list of indices
-        Each sublist of indices is a voxel, represented by the indices of its points
-        /!\ max_voxel_size is a diameter
+            Transforms the point cloud into a list of list of indices
+            Each sublist of indices is a voxel, represented by the indices of its points
+            /!\ max_voxel_size is a diameter
         """
     
         np.random.seed(seed) # For reproducibility
@@ -145,6 +143,12 @@ class VoxelCloud:
             (self.voxels if len(voxel_idxs) >= min_voxel_length else self.too_small_voxels).append(voxel_idxs)
         
     def postprocess_small_voxels(self, threshold_grow):
+        """
+            Transforms the list of too_small_voxels by:
+                - either putting them in bigger voxels if they are not too far from one of them (using threshold_grow)
+                - either storing them in unassociated_too_small_voxels
+        """
+        
         # Postprocessing voxels : computes size and geometric centers of voxels at this step before small voxels management 
         gc1 = np.ones((len(self.voxels), 3))
         gc2 = np.ones((len(self.too_small_voxels), 3))
@@ -172,6 +176,9 @@ class VoxelCloud:
                 self.unassociated_too_small_voxels.append(self.too_small_voxels[i])
         
     def compute_features(self):
+        """
+            Computes voxel features and stores them in the variables declared in the constructor
+        """
         for i in range(len(self)):
             coordinates_voxel_i = self.pointcloud.get_coordinates(self.voxels[i])
             vmin, vmax = np.min(coordinates_voxel_i, axis=0), np.max(coordinates_voxel_i, axis=0)
@@ -189,12 +196,17 @@ class VoxelCloud:
                 self.mean_color[i] = self.pointcloud.get_color(self.voxels[i]).mean(axis = 0)
                 self.var_color[i] = self.pointcloud.get_color(self.voxels[i]).var(axis = 0)
             self.verticality[i], self.linearity[i], self.planarity[i], self.sphericity[i] = features_from_PCA(eigval, eigvec)
-    
+            if self.has_label():
+                counts = np.bincount(self.get_labels_of_3D_points(i))
+                self.majority_label[i] = np.argmax(counts)
+                self.certainty_label[i] = np.max(counts) / np.sum(counts)
+            
+            
     def are_neighbours(self, i, j, c_D = 0.25):
         """
-        Generate a mask that tells whether one s-voxels and a group of s-voxels are neighbours or not (using the conditions from the link-chain method, cf. article)
-        i : index
-        j : index or list of indices
+            Generates a mask that tells whether one s-voxels and a group of s-voxels are neighbours or not (using the conditions from the link-chain method, cf. article)
+            i : index
+            j : index or list of indices
         """
         
         isnum = False
@@ -215,15 +227,6 @@ class VoxelCloud:
         mc_target = self.mean_color[i, :]
         mc_candidates = self.mean_color[j, :]
         
-        norm_target = self.normal[i, :]
-        norm_candidates = self.normal[j, :]
-        plan_target = self.planarity[i]
-        plan_candidates = self.planarity[j]
-        lin_target = self.linearity[i]
-        lin_candidates = self.linearity[j]
-        sph_target = self.sphericity[i]
-        sph_candidates = self.sphericity[j]
-        
         w_D = (size_target + size_candidates) / 2
         cond_D = np.all(abs(gc_target - gc_candidates) <= w_D + c_D, axis=1)
         
@@ -237,8 +240,6 @@ class VoxelCloud:
             w_C = np.maximum(vc_target, vc_candidates)
             cond_C = np.all(abs(mc_target - mc_candidates) <= 3 * np.sqrt(w_C), axis=1)
         
-        #cond_N = (abs(plan_target - plan_candidates) < 0.01) | (abs(lin_target - lin_candidates) < 0.01) | (abs(sph_target - sph_candidates) < 0.01) | (abs(np.sum(norm_target * norm_candidates, axis=1)) > 0.95)
-        
         cond = cond_D & cond_I & cond_C
         if isnum:
             return cond[0]
@@ -246,7 +247,9 @@ class VoxelCloud:
         return cond
     
     def find_spatial_neighbours(self, idxs, c_D):
-        """ Returns a list of indices of potential neighbouring voxels """
+        """
+            Returns a list of indices of potential neighbouring voxels
+        """
         max_size = np.max(self.size)
         if type(idxs) is int:
             return self.kdt.query_radius(self.geometric_center[[idxs], :], r = max_size + c_D)[0]
@@ -254,7 +257,9 @@ class VoxelCloud:
         
     
     def find_neighbours(self, idxs, c_D):
-        """ Returns a list of all indices who are truly neighbours of each index in idxs """
+        """
+            Returns a list of all indices who are truly neighbours of each index in idxs
+        """
         
         isnum = False
         if type(idxs) is int:
@@ -271,14 +276,65 @@ class VoxelCloud:
             
         return neighbours    
     
-    def get_all_3D_points_of_voxel(self, i):
-        return self.pointcloud.get_coordinates(self.voxels[i])
+    def get_labels_of_3D_points(self, i):
+        """
+            Fetches all the labels of the underlying 3D points for a voxel id or a list of voxel ids
+            According to the type of i (integer or iterable of integers), the result
+            shall be a 1-d numpy array or a list of 1-d numpy arrays (of different sizes)
+            
+            i may be an integer or a list of integers
+        """
+        if type(i) is int:
+            return self.pointcloud.get_label(self.voxels[i])
+        
+        labels = []
+        for ii in i:
+            labels.append(self.pointcloud.get_label(self.voxels[ii]))
+        return labels
+    
+    def get_all_3D_points(self, i):
+        """
+            Fetches all the underlying 3D points for a voxel id or a list of voxel ids
+            According to the type if i (integer or iterable of integers), the result
+            shall be a Nx3 numpy array or a list of Nx3 numpy arrays
+            
+            i may be integer or a list of integers
+        """
+        if type(i) is int:
+            return self.pointcloud.get_coordinates(self.voxels[i])
+        
+        points = []
+        for ii in i:
+            points.append(self.pointcloud.get_coordinates(self.voxels[ii]))
+        return points
     
     def get_all_unassociated_3D_points(self):
+        """
+            Fetches all the 3D points of voxels which were too small and that we weren't
+            able to associate to any bigger voxel
+        """
         results = []
         for i in self.unassociated_too_small_voxels:
             results.append(self.pointcloud.get_coordinates(i))
         return np.vstack(results)
+    
+    def has_laser_intensity(self):
+        """
+            Tells whether this voxel cloud has laser intensity information
+        """
+        return self.pointcloud.has_laser_intensity()
+    
+    def has_color(self):
+        """
+            Tells whether this voxel cloud has RGB color information
+        """
+        return self.pointcloud.has_color()
+    
+    def has_label(self):
+        """
+            Tells whether this voxel cloud has label information
+        """
+        return self.pointcloud.has_label()
     
     def __len__(self):
         return len(self.voxels)

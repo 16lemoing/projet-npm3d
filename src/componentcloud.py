@@ -12,15 +12,14 @@ class ComponentCloud:
     
     def __init__(self, voxelcloud, c_D = 0.25):
         """
-        Builds a cloud of connected component from a voxel cloud
-
-        Parameters
-        ----------
-        voxelcloud : VoxelCloud object
-        c_D : float, optional
-            Constant used when computing the voxel neighbours, in order to correct
-            the geometric distance. The default is 0.25.
-
+            Builds a cloud of connected component from a voxel cloud
+    
+            Parameters
+            ----------
+            voxelcloud : VoxelCloud object
+            c_D : float, optional
+                Constant used when computing the voxel neighbours, in order to correct
+                the geometric distance. The default is 0.25.
         """
                 
         self.voxelcloud = voxelcloud
@@ -31,6 +30,8 @@ class ComponentCloud:
         
         
         # Initializes and declares features
+        self.nb_points = np.ones(len(self), dtype=int)
+        self.nb_voxels = np.ones(len(self), dtype=int)
         self.barycenter = np.ones((len(self), 3))
         self.geometrical_center = np.ones((len(self), 3))
         self.mean_znormal = np.ones(len(self))
@@ -48,12 +49,23 @@ class ComponentCloud:
         self.mean_linearity = np.ones(len(self))
         self.mean_planarity = np.ones(len(self))
         self.mean_sphericity = np.ones(len(self))
+        self.computed_label = np.nan * np.ones(len(self), dtype=int)
         self.compute_features() # Computes features
         
         
     def compute_connected_components(self):
         """
-        Builds a list of connected components of voxels from a list of voxels
+            Builds a list of connected components of voxels from a voxelcloud object,
+            by performing a depth first search by using the neighbourhood condition
+            of voxels
+            
+            The list of connected components is then stored in 
+            self.components
+            
+            Each item of self.component is a list of indices, which are the indices of
+            the underlying VoxelCloud object
+            eg. self.components[i] = [1, 2, 3]
+                means that this component is made up of voxels 1, 2 and 3
         """
         
         n_voxels = len(self.voxelcloud)
@@ -85,7 +97,12 @@ class ComponentCloud:
             
     
     def compute_features(self):
+        """
+            Computes the individual features of each connected component
+        """
+        
         for i in range(len(self)):
+            vx_nb_points = self.voxelcloud.nb_points[self.components[i]]
             vx_barycenters = self.voxelcloud.barycenter[self.components[i]]
             vx_colors = self.voxelcloud.mean_color[self.components[i]]
             vx_intensities = self.voxelcloud.mean_intensity[self.components[i]]
@@ -98,6 +115,8 @@ class ComponentCloud:
             vx_planarities = self.voxelcloud.planarity[self.components[i]]
             vx_sphericities = self.voxelcloud.sphericity[self.components[i]]
             
+            self.nb_points[i] = np.sum(vx_nb_points)
+            self.nb_voxels[i] = len(self.components[i])
             self.barycenter[i, :] = np.sum(vx_barycenters * vx_nb_points[:, None], axis=0) / np.sum(vx_nb_points)
             p_max = np.max(vx_geometric_centers + vx_sizes / 2, axis=0)
             p_min = np.min(vx_geometric_centers + vx_sizes / 2, axis=0)
@@ -122,22 +141,67 @@ class ComponentCloud:
 
     def get_features(self):
         #TODO: stack all features
-        return 0
+        pass
+    
+    def eval_classification_error(self, idx = None, ground_truth_type = "pointwise"):
+        """
+            Computes the classification error for one ore several components in the cloud
+        """
+        if type(idx) is int:
+            idx = [idx]
+        if idx is None:
+            idx = list(range(len(self)))
+            
+        ground_truth = []
+        computed = []
+        for i in idx:
+            if ground_truth_type == "pointwise":
+                ground_truth.append(self.get_labels_of_all_3D_points_in_component(i))
+            else:
+                raise NotImplementedError()
+            
+            computed.append(self.nb_points[i] * [self.computed_label[i]])
+        
+        raise Exception()
+            
+        ground_truth, computed = np.hstack(ground_truth), np.hstack(computed)
+        correct = np.sum(ground_truth == computed) / len(computed)
+        
+        print(f"{correct * 100:.2f}% correctly classified [{ground_truth_type}, {len(computed)} samples]")
+            
     
     def get_all_3D_points_of_component(self, i):
-        points = []
-        for vx_id in self.components[i]:
-            points.append(self.voxelcloud.get_all_3D_points_of_voxel(vx_id))
-        return np.vstack(points)
-        
+        """
+            Fetches all the individual 3D points of component i in a Nx3 numpy array
+            i is a single index
+        """
+        return np.vstack(self.voxelcloud.get_all_3D_points(self.components[i]))
+    
+    def get_labels_of_all_3D_points_in_component(self, i):
+        """ 
+            Fetches all the labels of the individual points of the point cloud for component i
+            and groups them in a 1-dimensional numpy array
+            i is a single index
+        """
+        return np.hstack(self.voxelcloud.get_labels_of_3D_points(self.components[i]))
     
     def has_color(self):
-        """ Tells whether this cloud of connected components has color information """
+        """ 
+            Tells whether this cloud of connected components has color information
+        """
         return self.voxelcloud.has_color()
     
     def has_laser_intensity(self):
-        """ Tells whether this cloud of connected commonents has laser intensity information """
+        """
+            Tells whether this cloud of connected commonents has laser intensity information
+        """
         return self.voxelcloud.has_laser_intensity()
+    
+    def has_label(self):
+        """
+            Tells whether this cloud of connected components has labels
+        """
+        return self.voxelcloud.has_label()
     
     def __len__(self):
         return len(self.components)
