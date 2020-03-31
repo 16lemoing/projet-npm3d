@@ -49,8 +49,14 @@ class ComponentCloud:
         self.mean_linearity = np.ones(len(self))
         self.mean_planarity = np.ones(len(self))
         self.mean_sphericity = np.ones(len(self))
-        self.computed_label = np.nan * np.ones(len(self), dtype=int)
         self.compute_features() # Computes features
+        
+        # Initialize and declare labels
+        self.majority_label = np.nan * np.ones(len(self), dtype=int)
+        self.compute_labels() # Computes labels
+        
+        # Initialize predicted labels
+        self.predicted_label = np.nan * np.ones(len(self), dtype=int)
         
         
     def compute_connected_components(self):
@@ -122,10 +128,12 @@ class ComponentCloud:
             p_min = np.min(vx_geometric_centers + vx_sizes / 2, axis=0)
             self.geometrical_center[i, :] = (p_max + p_min) / 2
             self.size[i, :] = p_max - p_min
-            self.mean_color[i, :] = np.sum(vx_colors * vx_nb_points[:, None], axis = 0) / np.sum(vx_nb_points)
-            self.var_color[i, :] = np.sum((vx_colors - self.mean_color[i, :]) ** 2 * vx_nb_points[:, None], axis = 0) / np.sum(vx_nb_points)
-            self.mean_intensity[i] = np.sum(vx_intensities * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
-            #self.var_intensity[i] = np.sum((vx_intensities - self.mean_intensity[i, :]) ** 2 * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
+            if self.has_color():
+                self.mean_color[i, :] = np.sum(vx_colors * vx_nb_points[:, None], axis = 0) / np.sum(vx_nb_points)
+                self.var_color[i, :] = np.sum((vx_colors - self.mean_color[i, :]) ** 2 * vx_nb_points[:, None], axis = 0) / np.sum(vx_nb_points)
+            if self.has_laser_intensity():
+                self.mean_intensity[i] = np.sum(vx_intensities * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
+                self.var_intensity[i] = np.sum((vx_intensities - self.mean_intensity[i]) ** 2 * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
             self.mean_znormal[i] = np.sum(vx_normals[:, 2] * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
             self.var_znormal[i] = np.sum((vx_normals[:, 2] - self.mean_znormal[i]) ** 2 * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
             self.mean_xynormal[i] = np.sum(np.linalg.norm(vx_normals[:, :2], axis = 1) * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
@@ -138,10 +146,45 @@ class ComponentCloud:
             self.mean_planarity[i] = np.sum(vx_planarities * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
             self.mean_sphericity[i] = np.sum(vx_sphericities * vx_nb_points, axis = 0) / np.sum(vx_nb_points)
 
+    def compute_labels(self):
+        """
+            Computes the individual label of each connected component
+        """
+        
+        if self.has_label():
+            for i in range(len(self)):
+                vx_labels = self.voxelcloud.majority_label[self.components[i]]
+                vx_nb_points = self.voxelcloud.nb_points[self.components[i]]
+                
+                counts = np.bincount(vx_labels.astype(int), weights=vx_nb_points)
+                self.majority_label[i] = np.argmax(counts)
 
     def get_features(self):
-        #TODO: stack all features
-        pass
+        return np.hstack((self.nb_points[:, None],
+                          self.nb_voxels[:, None],
+                          self.barycenter,
+                          self.geometrical_center,
+                          self.mean_znormal[:, None],
+                          self.var_znormal[:, None],
+                          self.mean_xynormal[:, None],
+                          self.var_xynormal[:, None],
+                          (self.mean_intensity[:, None] if self.has_laser_intensity() else np.empty((len(self),0))),
+                          (self.var_intensity[:, None] if self.has_laser_intensity() else np.empty((len(self),0))),
+                          (self.mean_color if self.has_color() else np.empty((len(self),0))),
+                          (self.var_color if self.has_color() else np.empty((len(self),0))),
+                          self.pca_val,
+                          self.pca_vec,
+                          self.size,
+                          self.mean_verticality[:, None],
+                          self.mean_linearity[:, None],
+                          self.mean_planarity[:, None],
+                          self.mean_sphericity[:, None]))
+        
+    def get_labels(self):
+        return self.majority_label
+    
+    def set_predicted_labels(self, predicted_label):
+        self.predicted_label = predicted_label
     
     def eval_classification_error(self, idx = None, ground_truth_type = "pointwise"):
         """
@@ -153,21 +196,23 @@ class ComponentCloud:
             idx = list(range(len(self)))
             
         ground_truth = []
-        computed = []
+        predicted = []
         for i in idx:
             if ground_truth_type == "pointwise":
                 ground_truth.append(self.get_labels_of_all_3D_points_in_component(i))
+            elif ground_truth_type == "componentwise":
+                ground_truth.append(self.nb_points[i] * [self.majority_label[i]])
             else:
                 raise NotImplementedError()
             
-            computed.append(self.nb_points[i] * [self.computed_label[i]])
+            predicted.append(self.nb_points[i] * [self.predicted_label[i]])
         
-        raise Exception()
+        # raise Exception()
             
-        ground_truth, computed = np.hstack(ground_truth), np.hstack(computed)
-        correct = np.sum(ground_truth == computed) / len(computed)
+        ground_truth, predicted = np.hstack(ground_truth), np.hstack(predicted)
+        correct = np.sum(ground_truth == predicted) / len(predicted)
         
-        print(f"{correct * 100:.2f}% correctly classified [{ground_truth_type}, {len(computed)} samples]")
+        print(f"{correct * 100:.2f}% correctly classified [{ground_truth_type}, {len(predicted)} samples]")
             
     
     def get_all_3D_points_of_component(self, i):

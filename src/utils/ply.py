@@ -296,7 +296,7 @@ def describe_element(name, df):
     return element
     
 
-def make_ply(cloud_file, label_file, ply_file):
+def make_ply(cloud_file, label_file, ply_file, masked_label=None):
     """ Takes cloud and label text files and merge them in a ply file
 
     Parameters
@@ -307,7 +307,10 @@ def make_ply(cloud_file, label_file, ply_file):
     """
     cloud_data = np.loadtxt(cloud_file, delimiter=' ')
     label_data = np.loadtxt(label_file)
-    write_ply(ply_file, [cloud_data[:,:4], cloud_data[:,4:].astype(np.int32), label_data.astype(np.int32)], ['x', 'y', 'z', 'reflectance', 'red', 'green', 'blue', 'label'])
-
+    if masked_labels is not None:
+        mask = (label_data != masked_label)
+    else:
+        mask = np.ones(label_data.shape[0], dtype=bool)
+    write_ply(ply_file, [cloud_data[mask,:4], cloud_data[mask,4:].astype(np.int32), label_data[mask].astype(np.int32)], ['x', 'y', 'z', 'reflectance', 'red', 'green', 'blue', 'label'])
     
     
