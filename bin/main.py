@@ -46,12 +46,12 @@ from classifiers import Classifier
 # mask = ((cloud_data_2[:,0] > 9) & (cloud_data_2[:,0] < 17) & (cloud_data_2[:,1] > -51) & (cloud_data_2[:,1] < -31)) & (points_labels > 0)
 # write_ply('../data/bildstein_station5_xyz_intensity_rgb_test_extract.ply', [cloud_data_2[mask,:3], cloud_data_2[mask,-1], cloud_data_2[mask,3:6].astype(np.int32), points_labels[mask].astype(np.int32)], ['x', 'y', 'z', 'reflectance', 'red', 'green', 'blue', 'label'])
 
-make_ply("../data/bildstein_station3_xyz_intensity_rgb.txt", "../data/labels/bildstein_station3_xyz_intensity_rgb.labels", "../data/labels/bildstein_station3_xyz_intensity_rgb_labeled.ply", masked_label=0)
+make_ply("../data/bildstein_station3_xyz_intensity_rgb.txt", "../data/labels/bildstein_station3_xyz_intensity_rgb.labels", "../data/bildstein_station3_xyz_intensity_rgb_labeled.ply", masked_label=0)
 
 
 # %% Retrieve data
 
-data = read_ply("../data/bildstein_station5_xyz_intensity_rgb_labeled.ply")
+data = read_ply("../data/bildstein_station3_xyz_intensity_rgb_labeled.ply")
 cloud = np.vstack((data['x'], data['y'], data['z'])).T
 rgb_colors = np.vstack((data['red'], data['green'], data['blue'])).T
 dlaser = data['reflectance']
@@ -69,13 +69,15 @@ print(f"Nombre de gros voxels : {len(vc.voxels)}")
 
 # %% Saving voxel cloud for later use
 import pickle
-with open('../data/bildstein_station5_xyz_intensity_rgb_labeled_vc.pkl', 'wb') as handle:
+with open('../data/bildstein_station3_xyz_intensity_rgb_labeled_vc.pkl', 'wb') as handle:
     pickle.dump(vc, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
 # %% Loading voxel cloud
 import pickle
 with open('../data/bildstein_station5_xyz_intensity_rgb_labeled_vc.pkl', 'rb') as handle:
     vc = pickle.load(handle)
+with open('../data/bildstein_station3_xyz_intensity_rgb_labeled_vc.pkl', 'rb') as handle:
+    vc2 = pickle.load(handle)
 
 # %% Display voxels
 #plot(vc, only_voxel_center = False)
@@ -84,13 +86,18 @@ plot(vc, colors = vc.majority_label, only_voxel_center = False, also_unassociate
 
 # %% Compute components and display them
 cc = ComponentCloud(vc, c_D = 0.25)
-plot(cc, colors = None, only_voxel_center = True, also_unassociated_points = False)
-cc.eval_classification_error()
+cc2 = ComponentCloud(vc2, c_D = 0.25)
+#plot(cc, colors = None, only_voxel_center = True, also_unassociated_points = False)
+#cc.eval_classification_error()
 
 # %% Classify components
 classifier = Classifier('random_forest', {'n_estimators': 20})
 classifier.fit(cc)
 
-cc.set_predicted_labels(classifier.predict(cc))
-cc.eval_classification_error(ground_truth_type = "pointwise")
-cc.eval_classification_error(ground_truth_type = "componentwise")
+cc2.set_predicted_labels(cc2.get_labels())
+cc2.eval_classification_error(ground_truth_type = "pointwise")
+cc2.eval_classification_error(ground_truth_type = "componentwise")
+
+cc2.set_predicted_labels(classifier.predict(cc2))
+cc2.eval_classification_error(ground_truth_type = "pointwise")
+cc2.eval_classification_error(ground_truth_type = "componentwise")
