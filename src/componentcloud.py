@@ -153,8 +153,8 @@ class ComponentCloud:
         
         if self.has_label():
             for i in range(len(self)):
-                vx_labels = self.voxelcloud.majority_label[self.components[i]]
-                vx_nb_points = self.voxelcloud.nb_points[self.components[i]]
+                vx_labels = self.voxelcloud.features['majority_label'][self.components[i]]
+                vx_nb_points = self.voxelcloud.features['nb_points'][self.components[i]]
                 
                 counts = np.bincount(vx_labels.astype(int), weights=vx_nb_points)
                 self.majority_label[i] = np.argmax(counts)
