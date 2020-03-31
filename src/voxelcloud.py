@@ -300,6 +300,71 @@ class VoxelCloud:
             
         return neighbours    
     
+    def compute_connected_components(self, c_D):
+        """
+            Builds a list of connected components of voxels from a voxelcloud object,
+            by performing a depth first search by using the neighbourhood condition
+            of voxels
+            
+            The list of connected components is then returned
+            
+            Each item of self.component is a list of indices, which are the indices of
+            the underlying VoxelCloud object
+            eg. components[i] = [1, 2, 3]
+                means that this component #i is made up of voxels 1, 2 and 3
+        """
+        
+        n_voxels = len(self)
+        voxel_neighbours = self.find_neighbours(list(range(n_voxels)), c_D)
+        
+        # Explore connected components
+        components = []
+        indices = np.array(list(range(n_voxels)))
+        indices_mask = np.ones(n_voxels, dtype=bool)
+        
+        while len(indices) > 0:
+            stack = [indices[0]]
+            current_component = []
+            
+            # Run a depth first search to find all connected voxels
+            while len(stack) > 0:
+                idx = stack.pop()
+                if ~indices_mask[idx]:
+                    continue
+                current_component.append(idx)
+                indices_mask[idx] = False 
+                next_idxs = voxel_neighbours[idx]
+                stack.extend(list(next_idxs[indices_mask[next_idxs]]))
+            components.append(current_component)
+            
+            # Updating indices
+            indices = np.array(list(range(n_voxels)))[indices_mask]
+        
+        return components
+    
+    def remove_poorly_connected_voxels(self, c_D, threshold_nb_voxels):
+        """
+            Computes the connected components for the specified parameters of neighbourhood function,
+            then removed the connected components which have less voxels than the threshold
+        """
+        
+        cp = self.compute_connected_components(c_D)
+        lengths = np.zeros(len(cp))
+        for i in range(len(cp)):
+            lengths[i] = len(cp[i])
+        
+        idxs_cp_under_threshold = lengths < threshold_nb_voxels
+        nb_components_to_remove = np.sum(idxs_cp_under_threshold)
+        
+        if nb_components_to_remove > 0:
+            voxels_to_remove = np.hstack(np.array(cp)[idxs_cp_under_threshold])
+            self.remove_some_voxels(voxels_to_remove)
+        else:
+            voxels_to_remove = []
+        
+        return len(voxels_to_remove), nb_components_to_remove
+        
+    
     def get_labels_of_3D_points(self, i):
         """
             Fetches all the labels of the underlying 3D points for a voxel id or a list of voxel ids

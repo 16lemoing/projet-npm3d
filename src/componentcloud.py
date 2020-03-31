@@ -25,8 +25,7 @@ class ComponentCloud:
         self.voxelcloud = voxelcloud
         self.c_D = c_D
         
-        self.components = [] # This is a list of list of indices (each index is the #id of a voxel in voxelcloud)
-        self.compute_connected_components() # Fills self.components
+        self.components = self.voxelcloud.compute_connected_components(self.c_D)
         
         
         # Initializes and declares features
@@ -57,49 +56,6 @@ class ComponentCloud:
         
         # Initialize predicted labels
         self.predicted_label = np.nan * np.ones(len(self), dtype=int)
-        
-        
-    def compute_connected_components(self):
-        """
-            Builds a list of connected components of voxels from a voxelcloud object,
-            by performing a depth first search by using the neighbourhood condition
-            of voxels
-            
-            The list of connected components is then stored in 
-            self.components
-            
-            Each item of self.component is a list of indices, which are the indices of
-            the underlying VoxelCloud object
-            eg. self.components[i] = [1, 2, 3]
-                means that this component is made up of voxels 1, 2 and 3
-        """
-        
-        n_voxels = len(self.voxelcloud)
-        voxel_neighbours = self.voxelcloud.find_neighbours(list(range(n_voxels)), self.c_D)
-        
-        # Explore connected components
-        self.components = []
-        indices = np.array(list(range(n_voxels)))
-        indices_mask = np.ones(n_voxels, dtype=bool)
-        
-        while len(indices) > 0:
-            print(len(indices))
-            stack = [indices[0]]
-            current_component = []
-            
-            # Run a depth first search to find all connected voxels
-            while len(stack) > 0:
-                idx = stack.pop()
-                if ~indices_mask[idx]:
-                    continue
-                current_component.append(idx)
-                indices_mask[idx] = False 
-                next_idxs = voxel_neighbours[idx]
-                stack.extend(list(next_idxs[indices_mask[next_idxs]]))
-            self.components.append(current_component)
-            
-            # Updating indices
-            indices = np.array(list(range(n_voxels)))[indices_mask]
             
     
     def compute_features(self):
