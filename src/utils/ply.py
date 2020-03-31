@@ -307,7 +307,7 @@ def make_ply(cloud_file, label_file, ply_file, masked_label=None):
     """
     cloud_data = np.loadtxt(cloud_file, delimiter=' ')
     label_data = np.loadtxt(label_file)
-    if masked_labels is not None:
+    if masked_label is not None:
         mask = (label_data != masked_label)
     else:
         mask = np.ones(label_data.shape[0], dtype=bool)
