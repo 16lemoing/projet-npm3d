@@ -270,15 +270,22 @@ class VoxelCloud:
         
         return cond
     
-    def find_spatial_neighbours(self, idxs, c_D):
+    
+    def find_spatial_neighbours(self, idxs, c_D, exclude_self = True):
         """
             Returns a list of indices of potential neighbouring voxels
         """
+        
         max_size = np.max(self.features['size'])
         if type(idxs) is int:
-            return self.kdt.query_radius(self.features['geometric_center'][[idxs], :], r = max_size + c_D)[0]
-        return self.kdt.query_radius(self.features['geometric_center'][idxs, :], r = max_size + c_D)
+            res = self.kdt.query_radius(self.features['geometric_center'][[idxs], :], r = max_size + c_D)[0]
+            return res[res != idxs] if exclude_self else res
         
+        res = self.kdt.query_radius(self.features['geometric_center'][idxs, :], r = max_size + c_D)
+        if exclude_self:
+            for i in range(len(idxs)):
+                res[i] = res[i][res[i] != idxs[i]]
+        return res
     
     def find_neighbours(self, idxs, c_D):
         """
