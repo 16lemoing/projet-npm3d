@@ -5,6 +5,7 @@ import sys
 sys.path.append("..\\src") # Windows
 sys.path.append("../src") # Linux
 import time
+import matplotlib.pyplot as plt
 import numpy as np
 from utils.ply import read_ply, write_ply, make_ply
 from plots import plot
@@ -51,7 +52,7 @@ from classifiers import Classifier
 
 # %% Retrieve data
 
-data = read_ply("../data/bildstein_station5_xyz_intensity_rgb_test_extract.ply")
+data = read_ply("../data/bildstein_station5_xyz_intensity_rgb_extract.ply")
 cloud = np.vstack((data['x'], data['y'], data['z'])).T
 rgb_colors = np.vstack((data['red'], data['green'], data['blue'])).T
 dlaser = data['reflectance']
@@ -87,7 +88,8 @@ with open('../data/bildstein_station5_xyz_intensity_rgb_labeled_vc.pkl', 'rb') a
 plot(vc, colors = None, only_voxel_center = False, also_unassociated_points = True, also_removed_points = True)
 
 # %% Compute components and display them
-cc = ComponentCloud(vc, c_D = 0.25)
+cc = ComponentCloud(vc, c_D = 0.25, method="normal")
+cc = ComponentCloud(vc, c_D = 0.25, method="spectral", K = 17)
 plot(cc, colors = None, only_voxel_center = True, also_unassociated_points = False)
 cc.eval_classification_error()
 

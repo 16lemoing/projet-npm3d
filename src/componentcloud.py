@@ -10,7 +10,7 @@ from descriptors import local_PCA
 
 class ComponentCloud:
     
-    def __init__(self, voxelcloud, c_D = 0.25):
+    def __init__(self, voxelcloud, c_D = 0.25, method = "normal", K = 15):
         """
             Builds a cloud of connected component from a voxel cloud
     
@@ -25,7 +25,7 @@ class ComponentCloud:
         self.voxelcloud = voxelcloud
         self.c_D = c_D
         
-        self.components = self.voxelcloud.compute_connected_components(self.c_D)
+        self.components = self.voxelcloud.compute_connected_components(self.c_D) if method != "spectral" else self.voxelcloud.find_connected_components_similarity(self.c_D, weights = [1,1,1], K = K)
         
         
         # Initializes and declares features

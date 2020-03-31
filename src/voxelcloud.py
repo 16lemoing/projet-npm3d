@@ -3,6 +3,8 @@
 import numpy as np
 from sklearn.neighbors import KDTree
 from descriptors import local_PCA, features_from_PCA
+from sklearn.cluster import KMeans
+from sklearn.mixture import GaussianMixture
 import time
 
 
@@ -226,12 +228,13 @@ class VoxelCloud:
         self.kdt = KDTree(self.features['geometric_center'])
         
     
-    def are_neighbours(self, i, j, c_D = 0.25):
+    def are_neighbours(self, i, j, c_D):
         """
             Generates a mask that tells whether one s-voxels and a group of s-voxels are neighbours or not (using the conditions from the link-chain method, cf. article)
             i : index
             j : index or list of indices
         """
+        # TODO Can this be considered as a particular case of the similarity function ?
         
         isnum = False
         if type(j) is int:
@@ -270,6 +273,83 @@ class VoxelCloud:
         
         return cond
     
+    def similarity(self, i, j, c_D, weights = [1/3, 1/3, 1/3]):
+        """
+            Numeric representation of the similarity between two voxels
+            i : index
+            j : index or list of indices
+        
+            We define the similarity as follows:
+                0 if the voxels are spatially too far from each other (not found in find_spatial_neighbours)
+                otherwise: 
+                
+        """
+        
+        isnum = False
+        if type(j) is int:
+            isnum = True
+            j = [j]
+            
+        gc_target = self.features['geometric_center'][i, :]
+        gc_candidates = self.features['geometric_center'][j, :]
+        size_target = self.features['size'][i, :]
+        size_candidates = self.features['size'][j, :]
+        vi_target = self.features['var_intensity'][i]
+        vi_candidates = self.features['var_intensity'][j]
+        mi_target = self.features['mean_intensity'][i]
+        mi_candidates = self.features['mean_intensity'][j]
+        vc_target = self.features['var_color'][i, :]
+        vc_candidates = self.features['var_color'][j, :]
+        mc_target = self.features['mean_color'][i, :]
+        mc_candidates = self.features['mean_color'][j, :]
+        
+        sim = np.zeros(len(j))
+        
+        w_D = (size_target + size_candidates) / 2
+        w_I = np.maximum(vi_target, vi_candidates)
+        w_C = np.maximum(vc_target, vc_candidates)
+        
+        sim += weights[0] * np.sum(np.maximum(1 - abs(gc_target - gc_candidates) / (w_D + c_D), np.zeros((len(j), 3))), axis = 1)
+        
+        if self.has_laser_intensity() is not None:
+            sim += weights[1] * np.maximum(1 - abs(mi_target - mi_candidates) / 3 / (np.sqrt(w_I) + 1e-6), np.zeros(len(j)))
+        
+        if self.has_color() is not None:
+            sim += weights[2] * np.sum(np.maximum(1 - abs(mc_target - mc_candidates) / 3 / (np.sqrt(w_C) + 1e-6), np.zeros((len(j), 3))), axis = 1)
+
+        return sim[0] if isnum else sim
+    
+    def build_similarity_graph(self, c_D, weights):
+        A = np.zeros((len(self), len(self)))
+        D = np.zeros((len(self), len(self)))
+        
+        neighbours = []
+        idxs = list(range(len(self)))
+        potential = self.find_spatial_neighbours(idxs, c_D)
+        for i in range(len(self)):
+            similarity = self.similarity(i, potential[i], c_D, weights)
+            A[i, potential[i]] = similarity
+            D[i,i] = np.sum(similarity)
+            
+        return A, D
+    
+    def find_connected_components_similarity(self, c_D, weights, K):
+        A, D = self.build_similarity_graph(c_D, weights)
+        L = D - A
+        print("Finding the eigendecomposition of the Laplacian graph... This may require time.")
+        eigenvalues, eigenvectors = np.linalg.eigh(L)
+        print("Successfully diagonalized Laplacian matrix")
+        gm = GaussianMixture(K)
+        lbl = gm.fit_predict(eigenvectors[:,:K])
+        
+        components_idx = np.unique(lbl)
+        components = []
+        
+        for i in components_idx:
+            components.append(np.where(lbl == i)[0])
+        
+        return components
+        
     
     def find_spatial_neighbours(self, idxs, c_D, exclude_self = True):
         """
