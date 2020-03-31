@@ -102,18 +102,18 @@ class ComponentCloud:
         """
         
         for i in range(len(self)):
-            vx_nb_points = self.voxelcloud.nb_points[self.components[i]]
-            vx_barycenters = self.voxelcloud.barycenter[self.components[i]]
-            vx_colors = self.voxelcloud.mean_color[self.components[i]]
-            vx_intensities = self.voxelcloud.mean_intensity[self.components[i]]
-            vx_nb_points = self.voxelcloud.nb_points[self.components[i]]
-            vx_geometric_centers = self.voxelcloud.geometric_center[self.components[i]]
-            vx_sizes = self.voxelcloud.size[self.components[i]]
-            vx_normals = self.voxelcloud.normal[self.components[i]]
-            vx_verticalities = self.voxelcloud.verticality[self.components[i]]
-            vx_linerities = self.voxelcloud.linearity[self.components[i]]
-            vx_planarities = self.voxelcloud.planarity[self.components[i]]
-            vx_sphericities = self.voxelcloud.sphericity[self.components[i]]
+            vx_nb_points = self.voxelcloud.features['nb_points'][self.components[i]]
+            vx_barycenters = self.voxelcloud.features['barycenter'][self.components[i]]
+            vx_colors = self.voxelcloud.features['mean_color'][self.components[i]]
+            vx_intensities = self.voxelcloud.features['mean_intensity'][self.components[i]]
+            vx_nb_points = self.voxelcloud.features['nb_points'][self.components[i]]
+            vx_geometric_centers = self.voxelcloud.features['geometric_center'][self.components[i]]
+            vx_sizes = self.voxelcloud.features['size'][self.components[i]]
+            vx_normals = self.voxelcloud.features['normal'][self.components[i]]
+            vx_verticalities = self.voxelcloud.features['verticality'][self.components[i]]
+            vx_linerities = self.voxelcloud.features['linearity'][self.components[i]]
+            vx_planarities = self.voxelcloud.features['planarity'][self.components[i]]
+            vx_sphericities = self.voxelcloud.features['sphericity'][self.components[i]]
             
             self.nb_points[i] = np.sum(vx_nb_points)
             self.nb_voxels[i] = len(self.components[i])

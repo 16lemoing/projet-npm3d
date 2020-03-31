@@ -70,7 +70,7 @@ print(f"Nombre de gros voxels : {len(vc.voxels)}")
 ## Display voxels
 #plot(vc, only_voxel_center = False)
 #plot(vc, colors = vc.mean_intensity, only_voxel_center = False, also_unassociated_points = True)
-plot(vc, colors = vc.majority_label, only_voxel_center = False, also_unassociated_points = True)
+plot(vc, colors = None, only_voxel_center = False, also_unassociated_points = True, also_removed_points = True)
 
 ##
 # %% Compute components and display them

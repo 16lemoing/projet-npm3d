@@ -27,6 +27,11 @@ class VoxelCloud:
                 For reproducibility. The default is 42.
         """
         self.pointcloud = pointcloud
+        
+        self.voxels = []
+        self.too_small_voxels = []
+        self.removed_voxels = []
+        
         if method == "regular":
             self.compute_voxels_regular_grid(max_voxel_size, min_voxel_length)
         else:
@@ -37,25 +42,26 @@ class VoxelCloud:
         
         # Initializes features
         nb_voxels = len(self)
-        self.nb_points = np.zeros(nb_voxels)
-        self.geometric_center = np.zeros((nb_voxels, 3))
-        self.size = np.zeros((nb_voxels, 3))
-        self.normal = np.zeros((nb_voxels, 3))
-        self.barycenter = np.zeros((nb_voxels, 3))
-        self.mean_intensity = np.nan * np.ones(nb_voxels)
-        self.var_intensity = np.nan * np.ones(nb_voxels)
-        self.mean_color = np.nan * np.ones((nb_voxels, 3))
-        self.var_color = np.nan * np.ones((nb_voxels, 3))
-        self.verticality = np.nan * np.ones(nb_voxels)
-        self.linearity = np.nan * np.ones(nb_voxels)
-        self.planarity = np.nan * np.ones(nb_voxels)
-        self.sphericity = np.nan * np.ones(nb_voxels)
-        self.majority_label = np.nan * np.ones(nb_voxels)
-        self.certainty_label = np.nan * np.ones(nb_voxels)
+        self.features = {}
+        self.features['nb_points'] = np.zeros(nb_voxels)
+        self.features['geometric_center'] = np.zeros((nb_voxels, 3))
+        self.features['size'] = np.zeros((nb_voxels, 3))
+        self.features['normal'] = np.zeros((nb_voxels, 3))
+        self.features['barycenter'] = np.zeros((nb_voxels, 3))
+        self.features['mean_intensity'] = np.nan * np.ones(nb_voxels)
+        self.features['var_intensity'] = np.nan * np.ones(nb_voxels)
+        self.features['mean_color'] = np.nan * np.ones((nb_voxels, 3))
+        self.features['var_color'] = np.nan * np.ones((nb_voxels, 3))
+        self.features['verticality'] = np.nan * np.ones(nb_voxels)
+        self.features['linearity'] = np.nan * np.ones(nb_voxels)
+        self.features['planarity'] = np.nan * np.ones(nb_voxels)
+        self.features['sphericity'] = np.nan * np.ones(nb_voxels)
+        self.features['majority_label'] = np.nan * np.ones(nb_voxels)
+        self.features['certainty_label'] = np.nan * np.ones(nb_voxels)
         self.compute_features()
         
         # Initializes a kd-tree with geometric centers for further searches
-        self.kdt = KDTree(self.geometric_center)
+        self.kdt = KDTree(self.features['geometric_center'])
     
     def compute_voxels_regular_grid(self, max_voxel_size, min_voxel_length):
         """
@@ -91,9 +97,6 @@ class VoxelCloud:
         t2 = time.time()
         print(f"Finished computing voxel association in {t2-t1:.2f}s")
         
-        self.voxels = []
-        self.too_small_voxels = []
-        
         modulo = len(ctrunique) // 100
         for i in range(len(ctrunique)):
             if i % modulo == 0:
@@ -114,9 +117,6 @@ class VoxelCloud:
         all_idxs = np.array(range(len(self.pointcloud)))
         available_idxs = all_idxs.copy()
         available_idxs_mask = np.array(len(self.pointcloud) * [True])
-        
-        self.voxels = []
-        self.too_small_voxels = []
         
         while len(available_idxs) > 0:
             print(len(available_idxs))
@@ -174,6 +174,8 @@ class VoxelCloud:
                 self.voxels[nnidx[i]] = np.hstack((self.voxels[nnidx[i]], self.too_small_voxels[i]))
             else:
                 self.unassociated_too_small_voxels.append(self.too_small_voxels[i])
+                
+        self.too_small_voxels = self.unassociated_too_small_voxels
         
     def compute_features(self):
         """
@@ -184,24 +186,46 @@ class VoxelCloud:
             vmin, vmax = np.min(coordinates_voxel_i, axis=0), np.max(coordinates_voxel_i, axis=0)
             eigval, eigvec = local_PCA(coordinates_voxel_i)
             
-            self.nb_points[i] = len(self.voxels[i])
-            self.geometric_center[i] = (vmin + vmax) / 2
-            self.size[i] = vmax - vmin
-            self.normal[i] = eigvec[:, 2]
-            self.barycenter[i] = np.sum(coordinates_voxel_i, axis=0) / len(self.voxels[i])
+            self.features['nb_points'][i] = len(self.voxels[i])
+            self.features['geometric_center'][i] = (vmin + vmax) / 2
+            self.features['size'][i] = vmax - vmin
+            self.features['normal'][i] = eigvec[:, 2]
+            self.features['barycenter'][i] = np.sum(coordinates_voxel_i, axis=0) / len(self.voxels[i])
             if self.has_laser_intensity():
-                self.mean_intensity[i] = self.pointcloud.get_laser_intensity(self.voxels[i]).mean()
-                self.var_intensity[i] = self.pointcloud.get_laser_intensity(self.voxels[i]).var()
+                self.features['mean_intensity'][i] = self.pointcloud.get_laser_intensity(self.voxels[i]).mean()
+                self.features['var_intensity'][i] = self.pointcloud.get_laser_intensity(self.voxels[i]).var()
             if self.has_color():
-                self.mean_color[i] = self.pointcloud.get_color(self.voxels[i]).mean(axis = 0)
-                self.var_color[i] = self.pointcloud.get_color(self.voxels[i]).var(axis = 0)
-            self.verticality[i], self.linearity[i], self.planarity[i], self.sphericity[i] = features_from_PCA(eigval, eigvec)
+                self.features['mean_color'][i] = self.pointcloud.get_color(self.voxels[i]).mean(axis = 0)
+                self.features['var_color'][i] = self.pointcloud.get_color(self.voxels[i]).var(axis = 0)
+            self.features['verticality'][i], self.features['linearity'][i], self.features['planarity'][i], self.features['sphericity'][i] = features_from_PCA(eigval, eigvec)
             if self.has_label():
                 counts = np.bincount(self.get_labels_of_3D_points(i))
-                self.majority_label[i] = np.argmax(counts)
-                self.certainty_label[i] = np.max(counts) / np.sum(counts)
+                self.features['majority_label'][i] = np.argmax(counts)
+                self.features['certainty_label'][i] = np.max(counts) / np.sum(counts)
             
             
+    def remove_some_voxels(self, idxs_to_remove):
+        """
+            In case we need to remove some of the voxels after postprocessing:
+            we need to remove them from the list of voxels and recompute the features
+            
+            idxs_to_remove should be a numpy array of indices
+        """
+        
+        remove_mask = np.zeros(len(self), dtype=bool)
+        remove_mask[idxs_to_remove] = True
+        
+        arr_vx = np.array(self.voxels)
+        
+        for k in self.features.keys():
+            self.features[k] = self.features[k][~remove_mask]
+            
+        self.removed_voxels.extend(list(arr_vx[remove_mask]))
+        self.voxels = list(arr_vx[~remove_mask])
+        
+        self.kdt = KDTree(self.features['geometric_center'])
+        
+    
     def are_neighbours(self, i, j, c_D = 0.25):
         """
             Generates a mask that tells whether one s-voxels and a group of s-voxels are neighbours or not (using the conditions from the link-chain method, cf. article)
@@ -214,18 +238,18 @@ class VoxelCloud:
             isnum = True
             j = [j]
         
-        gc_target = self.geometric_center[i, :]
-        gc_candidates = self.geometric_center[j, :]
-        size_target = self.size[i, :]
-        size_candidates = self.size[j, :]
-        vi_target = self.var_intensity[i]
-        vi_candidates = self.var_intensity[j]
-        mi_target = self.mean_intensity[i]
-        mi_candidates = self.mean_intensity[j]
-        vc_target = self.var_color[i, :]
-        vc_candidates = self.var_color[j, :]
-        mc_target = self.mean_color[i, :]
-        mc_candidates = self.mean_color[j, :]
+        gc_target = self.features['geometric_center'][i, :]
+        gc_candidates = self.features['geometric_center'][j, :]
+        size_target = self.features['size'][i, :]
+        size_candidates = self.features['size'][j, :]
+        vi_target = self.features['var_intensity'][i]
+        vi_candidates = self.features['var_intensity'][j]
+        mi_target = self.features['mean_intensity'][i]
+        mi_candidates = self.features['mean_intensity'][j]
+        vc_target = self.features['var_color'][i, :]
+        vc_candidates = self.features['var_color'][j, :]
+        mc_target = self.features['mean_color'][i, :]
+        mc_candidates = self.features['mean_color'][j, :]
         
         w_D = (size_target + size_candidates) / 2
         cond_D = np.all(abs(gc_target - gc_candidates) <= w_D + c_D, axis=1)
@@ -250,10 +274,10 @@ class VoxelCloud:
         """
             Returns a list of indices of potential neighbouring voxels
         """
-        max_size = np.max(self.size)
+        max_size = np.max(self.features['size'])
         if type(idxs) is int:
-            return self.kdt.query_radius(self.geometric_center[[idxs], :], r = max_size + c_D)[0]
-        return self.kdt.query_radius(self.geometric_center[idxs, :], r = max_size + c_D)
+            return self.kdt.query_radius(self.features['geometric_center'][[idxs], :], r = max_size + c_D)[0]
+        return self.kdt.query_radius(self.features['geometric_center'][idxs, :], r = max_size + c_D)
         
     
     def find_neighbours(self, idxs, c_D):
@@ -314,9 +338,18 @@ class VoxelCloud:
             able to associate to any bigger voxel
         """
         results = []
-        for i in self.unassociated_too_small_voxels:
+        for i in self.too_small_voxels:
             results.append(self.pointcloud.get_coordinates(i))
-        return np.vstack(results)
+        return np.vstack(results) if len(results) > 0 else np.array([])
+    
+    def get_all_removed_3D_points(self):
+        """
+            Fetches all the 3D points of voxels which were removed using the remove_some_voxels function
+        """
+        results = []
+        for i in self.removed_voxels:
+            results.append(self.pointcloud.get_coordinates(i))
+        return np.vstack(results) if len(results) > 0 else np.array([])
     
     def has_laser_intensity(self):
         """
