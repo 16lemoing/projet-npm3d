@@ -8,6 +8,7 @@ from glob import glob
 import pickle
 import os
 import time
+import random
 import matplotlib.pyplot as plt
 import numpy as np
 from utils.ply import read_ply, write_ply, make_ply
@@ -98,25 +99,8 @@ for pkl_file in glob(os.path.join(vc_backup_folder, "*.pkl")):
 
 # %% Classify components
 
-import sys
-sys.path.append("..\\src") # Windows
-sys.path.append("../src") # Linux
-from glob import glob
-import pickle
-import os
-import time
-import matplotlib.pyplot as plt
-import numpy as np
-from utils.ply import read_ply, write_ply, make_ply
-from plots import plot
-from pointcloud import PointCloud
-from voxelcloud import VoxelCloud
-from componentcloud import ComponentCloud
-from classifiers import ComponentClassifier
-
-
-
 cc_backup_folder = "../data/backup/component_cloud"
+pc_backup_folder = "../data/backup/predicted_cloud"
 train_cc_files = ["bildstein3.pkl", "domfountain2.pkl"]
 test_cc_files = ["bildstein5.pkl", "neugasse.pkl", "untermaederbrunnen1.pkl"]
 
@@ -159,7 +143,32 @@ for i, cc in enumerate(test_cc):
     cc.eval_classification_error(ground_truth_type = "pointwise", include_unassociated_points=True)
     cc.eval_classification_error(ground_truth_type = "componentwise")
 
-#####################################################################################################################
+# Save train results (predicted components, predicted labels, groundtruth labels)
+print("Saving train results")
+for i, cc in enumerate(train_cc):
+    ply_file = os.path.join(pc_backup_folder, 'train_' + train_cc_files[i]).replace('pkl', 'ply')
+    cloud_point = np.vstack([cc.voxelcloud.features["geometric_center"][c] for c in cc.components])
+    component = np.hstack([random.random() * np.ones(len(c)) for c in cc.components])
+    predicted_label = np.hstack([cc.predicted_label[i] * np.ones(len(c)) for i, c in enumerate(cc.components)])
+    groundtruth_label = np.hstack([cc.majority_label[i] * np.ones(len(c)) for i, c in enumerate(cc.components)])
+    write_ply(ply_file, [cloud_point, component, predicted_label, groundtruth_label], ['x', 'y', 'z', 'predicted_component', 'predicted_label', 'groundtruth_label'])
+    
+# Save test results (predicted components, predicted labels, groundtruth labels)
+print("Saving test results")
+for i, cc in enumerate(test_cc):
+    ply_file = os.path.join(pc_backup_folder, 'test_' + test_cc_files[i]).replace('pkl', 'ply')
+    cloud_point = np.vstack([cc.voxelcloud.features["geometric_center"][c] for c in cc.components])
+    component = np.hstack([random.random() * np.ones(len(c)) for c in cc.components])
+    predicted_label = np.hstack([cc.predicted_label[i] * np.ones(len(c)) for i, c in enumerate(cc.components)])
+    groundtruth_label = np.hstack([cc.majority_label[i] * np.ones(len(c)) for i, c in enumerate(cc.components)])
+    write_ply(ply_file, [cloud_point, component, predicted_label, groundtruth_label], ['x', 'y', 'z', 'predicted_component', 'predicted_label', 'groundtruth_label'])
+    
+print("Done")
+
+##################
+#    Old main    #
+##################
+
 # %% Retrieve data
 
 data = read_ply("../data/bildstein_station3_xyz_intensity_rgb_labeled.ply")
@@ -213,12 +222,7 @@ cc.eval_classification_error(ground_truth_type = "componentwise")
 
 # %%
 import random 
-ply_file = '../data/bildstein_station3_xyz_intensity_rgb_labeled_cc_predicted_component_and_predicted_label.pkl'
-cloud_point = np.vstack([cc.voxelcloud.features["geometric_center"][c] for c in cc.components])
-component = np.hstack([random.random() * np.ones(len(c)) for c in cc.components])
-predicted_label = np.hstack([cc.predicted_label[i] * np.ones(len(c)) for i, c in enumerate(cc.components)])
-groundtruth_label = np.hstack([cc.majority_label[i] * np.ones(len(c)) for i, c in enumerate(cc.components)])
-write_ply(ply_file, [cloud_point, component, predicted_label, groundtruth_label], ['x', 'y', 'z', 'predicted_component', 'predicted_label', 'groundtruth_label'])
+
 
 
 # %% Classify components
