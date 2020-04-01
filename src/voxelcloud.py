@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+from tqdm import tqdm
 from sklearn.neighbors import KDTree
 from descriptors import local_PCA, features_from_PCA
+from RANSAC import RANSAC, in_plane
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 import time
@@ -75,9 +77,10 @@ class VoxelCloud:
         maxi = np.max(pts, axis = 0)
         
         centers = []
-        # Iraitement des z les uns après les autres pour éviter de remplir la RAM
-        for z in np.arange(mini[2] + max_voxel_size / 2, maxi[2], max_voxel_size):
-            print(f"z={z:.2f}")
+        # Traitement des z les uns après les autres pour éviter de remplir la RAM
+        print("Scanning point cloud at every height to find populated cells")
+        for z in tqdm(np.arange(mini[2] + max_voxel_size / 2, maxi[2], max_voxel_size)):
+            # print(f"z={z:.2f}")
             centers_xy = np.stack(np.meshgrid(np.arange(mini[0] + max_voxel_size / 2, maxi[0], max_voxel_size), np.arange(mini[1] + max_voxel_size / 2, maxi[1], max_voxel_size)), axis=2).reshape((-1,2))
             centers_z = np.hstack((centers_xy, z * np.ones((len(centers_xy), 1))))
             
@@ -100,9 +103,10 @@ class VoxelCloud:
         print(f"Finished computing voxel association in {t2-t1:.2f}s")
         
         modulo = len(ctrunique) // 100
-        for i in range(len(ctrunique)):
-            if i % modulo == 0:
-                print(f"{100*i / len(ctrunique):.1f}%")
+        print("Saving voxels")
+        for i in tqdm(range(len(ctrunique))):
+            # if i % modulo == 0:
+            #     print(f"{100*i / len(ctrunique):.1f}%")
             voxel_idxs = np.where(ctr == ctrunique[i])[0]
             (self.voxels if len(voxel_idxs) >= min_voxel_length else self.too_small_voxels).append(voxel_idxs)
         
@@ -387,7 +391,7 @@ class VoxelCloud:
             
         return neighbours    
     
-    def compute_connected_components(self, c_D):
+    def compute_connected_components(self, c_D, segment_out_ground, min_component_length):
         """
             Builds a list of connected components of voxels from a voxelcloud object,
             by performing a depth first search by using the neighbourhood condition
@@ -404,11 +408,25 @@ class VoxelCloud:
         n_voxels = len(self)
         voxel_neighbours = self.find_neighbours(list(range(n_voxels)), c_D)
         
-        # Explore connected components
+        # Initialize connected components
         components = []
+        too_small_components = []
         indices = np.array(list(range(n_voxels)))
         indices_mask = np.ones(n_voxels, dtype=bool)
         
+        # Segment out the ground
+        if segment_out_ground:
+            NB_RANDOM_DRAWS = 1000
+            threshold_in = 1
+            threshold_normals = 0.8
+            best_ref_pt, best_normal = RANSAC(self.features['geometric_center'], self.features['normal'], NB_RANDOM_DRAWS, threshold_in, threshold_normals)
+            ground_mask = in_plane(self.features['geometric_center'], self.features['normal'], best_ref_pt, best_normal, threshold_in, threshold_normals)
+            ground_idxes = indices[ground_mask]
+            indices_mask[ground_idxes] = False
+            indices = np.array(list(range(n_voxels)))[indices_mask]
+            components.append(list(ground_idxes))
+        
+        # Explore connected components
         while len(indices) > 0:
             stack = [indices[0]]
             current_component = []
@@ -422,12 +440,15 @@ class VoxelCloud:
                 indices_mask[idx] = False 
                 next_idxs = voxel_neighbours[idx]
                 stack.extend(list(next_idxs[indices_mask[next_idxs]]))
-            components.append(current_component)
+            if len(current_component) >= min_component_length:
+                components.append(current_component)
+            else:
+                too_small_components.append(current_component)
             
             # Updating indices
             indices = np.array(list(range(n_voxels)))[indices_mask]
         
-        return components
+        return components, too_small_components
     
     def remove_poorly_connected_voxels(self, c_D, threshold_nb_voxels):
         """

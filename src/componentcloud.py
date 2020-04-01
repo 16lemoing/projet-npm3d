@@ -7,10 +7,11 @@ Created on Sat Mar 28 16:16:52 2020
 
 import numpy as np
 from descriptors import local_PCA
+from sklearn.neighbors import KDTree
 
 class ComponentCloud:
     
-    def __init__(self, voxelcloud, c_D = 0.25, method = "normal", K = 15):
+    def __init__(self, voxelcloud, c_D = 0.25, method = "normal", K = 15, segment_out_ground=False, min_component_length=1):
         """
             Builds a cloud of connected component from a voxel cloud
     
@@ -25,8 +26,11 @@ class ComponentCloud:
         self.voxelcloud = voxelcloud
         self.c_D = c_D
         
-        self.components = self.voxelcloud.compute_connected_components(self.c_D) if method != "spectral" else self.voxelcloud.find_connected_components_similarity(self.c_D, weights = [1,1,1], K = K)
-        
+        if method == "spectral":
+            self.components = self.voxelcloud.find_connected_components_similarity(self.c_D, weights = [1,1,1], K = K)
+            self.too_small_components = []
+        else:
+            self.components, self.too_small_components = self.voxelcloud.compute_connected_components(self.c_D, segment_out_ground, min_component_length)
         
         # Initializes and declares features
         self.nb_points = np.ones(len(self), dtype=int)
@@ -116,6 +120,9 @@ class ComponentCloud:
                 self.majority_label[i] = np.argmax(counts)
 
     def get_features(self):
+        """
+            Computes the features necessary for training the component classifier
+        """
         return np.hstack((self.nb_points[:, None],
                           self.nb_voxels[:, None],
                           self.barycenter,
@@ -137,12 +144,18 @@ class ComponentCloud:
                           self.mean_sphericity[:, None]))
         
     def get_labels(self):
+        """
+            Retrieves the labels necessary for training the component classifier
+        """
         return self.majority_label
     
     def set_predicted_labels(self, predicted_label):
+        """
+            Assigns the component label values based on the trained classifier
+        """
         self.predicted_label = predicted_label
     
-    def eval_classification_error(self, idx = None, ground_truth_type = "pointwise"):
+    def eval_classification_error(self, idx = None, ground_truth_type = "pointwise", include_unassociated_points=False):
         """
             Computes the classification error for one ore several components in the cloud
         """
@@ -153,6 +166,8 @@ class ComponentCloud:
             
         ground_truth = []
         predicted = []
+        
+        # Get ground truth and predicted labels for components
         for i in idx:
             if ground_truth_type == "pointwise":
                 ground_truth.append(self.get_labels_of_all_3D_points_in_component(i))
@@ -163,12 +178,43 @@ class ComponentCloud:
             
             predicted.append(self.nb_points[i] * [self.predicted_label[i]])
         
-        # raise Exception()
+        # Get ground truth and predicted labels for all unassociated points
+        if ground_truth_type == "pointwise" and include_unassociated_points:
+            
+            # Identify all voxels that are part of a component
+            associated_voxels_mask = np.array(list(range(len(self.voxelcloud))))
+            for component in self.too_small_components:
+                for voxel in component:
+                    associated_voxels_mask[voxel] = False
+                    
+            # Get predicted label for all associated voxels
+            voxel_predicted_label = np.ones(len(self.voxelcloud))
+            for i, voxels in enumerate(self.components):
+                voxel_predicted_label[voxels] = self.predicted_label[i]
+            voxel_predicted_label = voxel_predicted_label[associated_voxels_mask]
+            
+            # Build a KDTree from their geometric center
+            gc = self.voxelcloud.features['geometric_center'][associated_voxels_mask]
+            kdtc = KDTree(gc)
+            
+            # Retrieve all unassociated points (from isolated voxels and components)
+            pts = self.get_all_unassociated_3D_points()
+            
+            # Find the nearest associated voxel
+            _, ctr = kdtc.query(pts, k = 1)
+            ctr = ctr[:, 0]
+            
+            # Transfer predicted labels to unassociated points
+            predicted.append(voxel_predicted_label[ctr])
+            
+            # Retrieve ground truth labels for unassociated points
+            unassociated_points_idxes = self.get_all_unassociated_3D_points_idxes()
+            ground_truth.append(self.voxelcloud.pointcloud.get_label(unassociated_points_idxes))
             
         ground_truth, predicted = np.hstack(ground_truth), np.hstack(predicted)
         correct = np.sum(ground_truth == predicted) / len(predicted)
         
-        print(f"{correct * 100:.2f}% correctly classified [{ground_truth_type}, {len(predicted)} samples]")
+        print(f"{correct * 100:.2f}% correctly classified [{ground_truth_type}, {len(predicted)} samples {'(including unassociated points)' if include_unassociated_points else ''}]")
             
     
     def get_all_3D_points_of_component(self, i):
@@ -185,6 +231,34 @@ class ComponentCloud:
             i is a single index
         """
         return np.hstack(self.voxelcloud.get_labels_of_3D_points(self.components[i]))
+    
+    def get_all_unassociated_3D_points(self):
+        """
+            Fetches all the 3D points of voxels which were too small and that we weren't
+            able to associate to any bigger voxel and also 3D points of voxels which
+            were part of components too small
+        """
+        results = []
+        for i in self.voxelcloud.too_small_voxels:
+            results.append(self.voxelcloud.pointcloud.get_coordinates(i))
+        for voxels in self.too_small_components:
+            for i in voxels:
+                results.append(self.voxelcloud.pointcloud.get_coordinates(i))
+        return np.vstack(results) if len(results) > 0 else np.array([])
+
+    def get_all_unassociated_3D_points_idxes(self):
+        """
+            Fetches all the 3D points idxes of voxels which were too small and that 
+            we weren't able to associate to any bigger voxel and also 3D points of
+            voxels which were part of components too small
+        """
+        results = []
+        for i in self.voxelcloud.too_small_voxels:
+            results.append(i)
+        for voxels in self.too_small_components:
+            for i in voxels:
+                results.append(i)
+        return np.hstack(results).astype(int) if len(results) > 0 else np.array([])
     
     def has_color(self):
         """ 

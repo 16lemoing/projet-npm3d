@@ -26,7 +26,7 @@ def compute_plane(points):
     return point, normal
 
 
-def in_plane(points, ref_pt, normal, threshold_in=0.1):
+def in_plane(points, normals, ref_pt, ref_normal, threshold_in=0.1, threshold_normals=0.8):
     """
     Checks whether the given points belong to a given plane (with some threshold value)
 
@@ -34,19 +34,22 @@ def in_plane(points, ref_pt, normal, threshold_in=0.1):
     ----------
     points : Nx3 numpy array
     ref_pt : 3-numpy array (a point of the plane)
-    normal : 3-numpy array (unit vector of the plane)
+    ref_normal : 3-numpy array (unit vector of the plane)
     threshold_in : float: maximum distance to the plane for points to belong to it
 
     Returns
     -------
     indices : N-numpy array of booleans telling which points belong to the plane
     """
-    dists = np.einsum("i,ji->j", normal, points - ref_pt)
+    dists = np.einsum("i,ji->j", ref_normal, points - ref_pt)
     indices = abs(dists) < threshold_in
+    if normals is not None:
+        normal_check = np.dot(ref_normal, normals.T) > threshold_normals
+        return indices & normal_check
     return indices
 
 
-def RANSAC(points, NB_RANDOM_DRAWS=100, threshold_in=0.1):
+def RANSAC(points, normals=None, NB_RANDOM_DRAWS=100, threshold_in=0.1, threshold_normals=0.8):
     """
     Applies the RANSAC algorithm to find a plane
 
@@ -76,16 +79,16 @@ def RANSAC(points, NB_RANDOM_DRAWS=100, threshold_in=0.1):
         pts = points[rand_indices]
         
         # Finding the associated plane
-        ref_pt, normal = compute_plane(pts)
+        ref_pt, ref_normal = compute_plane(pts)
         
         # Couting the number of points in this plane
-        nb = np.sum(in_plane(points, ref_pt, normal, threshold_in))
+        nb = np.sum(in_plane(points, normals, ref_pt, ref_normal, threshold_in))
         
         # Updating the best plane if needed
         if nb > best_nb:
             best_nb = nb
             best_ref_pt = ref_pt
-            best_normal = normal
+            best_normal = ref_normal
                 
     return best_ref_pt, best_normal
 
