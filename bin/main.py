@@ -5,6 +5,7 @@ import sys
 sys.path.append("..\\src") # Windows
 sys.path.append("../src") # Linux
 import time
+import matplotlib.pyplot as plt
 import numpy as np
 from utils.ply import read_ply, write_ply, make_ply
 from plots import plot
@@ -62,6 +63,10 @@ pc = PointCloud(cloud, dlaser, rgb_colors, label)
 vc = VoxelCloud(pc, max_voxel_size = 0.3, threshold_grow = 2, min_voxel_length = 3, method = "regular")
 print(f"Nombre de voxels trop petits non associés à des gros voxels : {len(vc.unassociated_too_small_voxels)}")
 print(f"Nombre de gros voxels : {len(vc.voxels)}")
+
+a, b = vc.remove_poorly_connected_voxels(0.25, 10)
+print(f"Nombre de voxels supprimés après exploration du graphe car mal connectés : {a}")
+
 #plot(vc, colors = vc.mean_color, only_voxel_center = True)
 # %%
 #vc.are_neighbours(1, [2,3])
@@ -82,13 +87,14 @@ with open('../data/bildstein_station3_xyz_intensity_rgb_labeled_vc.pkl', 'rb') a
 # %% Display voxels
 #plot(vc, only_voxel_center = False)
 #plot(vc, colors = vc.mean_intensity, only_voxel_center = False, also_unassociated_points = True)
-plot(vc, colors = vc.majority_label, only_voxel_center = False, also_unassociated_points = True)
+plot(vc, colors = None, only_voxel_center = False, also_unassociated_points = True, also_removed_points = True)
 
 # %% Compute components and display them
 cc = ComponentCloud(vc, c_D = 0.25)
 cc2 = ComponentCloud(vc2, c_D = 0.25)
 #plot(cc, colors = None, only_voxel_center = True, also_unassociated_points = False)
 #cc.eval_classification_error()
+
 
 # %% Classify components
 classifier = Classifier('random_forest', {'n_estimators': 20})

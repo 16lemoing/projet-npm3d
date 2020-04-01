@@ -74,7 +74,7 @@ from mpl_toolkits.mplot3d import Axes3D
 #     plt.show()
 
 
-def plot(cloud, idxs = None, colors = None, only_voxel_center = True, also_unassociated_points = False):
+def plot(cloud, idxs = None, colors = None, only_voxel_center = True, also_unassociated_points = False, also_removed_points = False):
     
     if idxs is None:
         idxs = list(range(len(cloud)))
@@ -100,9 +100,9 @@ def plot(cloud, idxs = None, colors = None, only_voxel_center = True, also_unass
     for i in range(len(idxs)):
         if only_voxel_center:
             if cloudtype == "component":
-                data = cloud.voxelcloud.geometric_center[cloud.components[i], :]
+                data = cloud.voxelcloud.features['geometric_center'][cloud.components[i], :]
             else:
-                data = cloud.geometric_center[[i], :]
+                data = cloud.features['geometric_center'][[i], :]
         else:
             if cloudtype == "component":
                 data = cloud.get_all_3D_points_of_component(i)
@@ -116,6 +116,15 @@ def plot(cloud, idxs = None, colors = None, only_voxel_center = True, also_unass
             data = cloud.voxelcloud.get_all_unassociated_3D_points()
         else:
             data = cloud.get_all_unassociated_3D_points()
-        ax.plot(data[:,0], data[:,1], data[:,2], '+', c='black')
+        if len(data) > 0:
+            ax.plot(data[:,0], data[:,1], data[:,2], '+', c='black')
+        
+    if also_removed_points:
+        if cloudtype == "component":
+            data = cloud.voxelcloud.get_all_removed_3D_points()
+        else:
+            data = cloud.get_all_removed_3D_points()
+        if len(data) > 0:
+            ax.plot(data[:,0], data[:,1], data[:,2], 'o', c='black')
     
     plt.show()
