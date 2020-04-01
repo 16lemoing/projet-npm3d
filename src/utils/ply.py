@@ -25,6 +25,7 @@
 # Basic libs
 import numpy as np
 import sys
+import pandas as pd
 
 
 # Define PLY types
@@ -305,9 +306,9 @@ def make_ply(cloud_file, label_file, ply_file, masked_label=None):
     label_file: str
     ply_folder: str
     """
-    cloud_data = np.loadtxt(cloud_file, delimiter=' ')
-    label_data = np.loadtxt(label_file)
-    if masked_label is not None:
+    cloud_data = pd.read_csv(cloud_file, delimiter=' ', header=None).values
+    label_data = pd.read_csv(label_file, header=None).values.T[0]
+    if masked_labels is not None:
         mask = (label_data != masked_label)
     else:
         mask = np.ones(label_data.shape[0], dtype=bool)

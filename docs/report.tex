@@ -55,28 +55,40 @@ Nous proposons dans ce document une analyse synthétique critique de la méthode
 
 \section{Une nouvelle représentation plus parcimonieuse des nuages de points}
 \subsection{Voxels et propriétés locales du nuage}
-Le cœur de la méthode proposée repose sur une nouvelle représentation du nuage de points initialement acquis sous forme d'un nuage de voxels. On définit un voxel comme étant un ensemble de points 3D spatialement proches. En fonction de ce que \og proche \fg\ signifie, un voxel pourra contenir entre 5 à 100 points les uns des autres : si le nuage de points est dense, il est probable que les points soient redondants et qu'ils aient localement les mêmes propriétés (même couleur, même intensité de réflectance laser, ...) et leur fusion dans un seul voxel permet de diminuer considérablement la taille de la représentation. Si le nuage est peu dense à un autre endroit, un voxel comportera peu de points 3D mais \emph{pèsera} autant qu'un voxel issu d'une zone plus dense lors de l'analyse de la scène. Ceci permet de rectifier les inhomogénéités de densité dues à l'acquisition.
+Le cœur de la méthode proposée repose sur une nouvelle représentation du nuage de points initialement acquis sous forme d'un nuage de voxels. On définit un voxel comme étant un ensemble de points 3D spatialement proches. En fonction de ce que \og proche \fg\ signifie, un voxel pourra contenir entre 5 à 100 points les uns des autres : si le nuage de points est dense, il est probable que les points soient redondants et qu'ils aient localement les mêmes propriétés (même couleur, même intensité de réflectance laser, ...) et leur fusion dans un seul voxel permet de diminuer considérablement la taille de la représentation ainsi que la redondance. Si le nuage est peu dense à un autre endroit, un voxel comportera peu de points 3D mais \emph{pèsera} autant qu'un voxel issu d'une zone plus dense lors de l'analyse de la scène. Ceci permet de rectifier les inhomogénéités de densité dues à l'acquisition.
 
 Par ailleurs, un voxel est par définition un ensemble de points spatialement proches : cette caractéristique permet de calculer des propriétés pour chaque voxel en combinant les propriétés de chacun de ses points composants. Il est par exemple possible de calculer la couleur moyenne des points, la variance de celle-ci, un vecteur normal par analyse des composantes principales lorsque le voxel possède au moins 3 points, etc. À une taille de voxel donnée, ces propriétés seront souvent plus robustes que les propriétés équivalentes de chaque point composant : la couleur moyenne est par exemple un bon estimateur de la couleur à cet endroit de l'espace ; elle filtre les éventuelles valeurs aberrantes \emph{outliers} qui auraient pu être présentes sur les points. De même, le vecteur normal d'un plan sera plus stable dès lors que l'on aura un nombre suffisant de points définissant le plan dans le voxel.
 
 \subsection{Algorithme de transformation du nuage en nuage de voxels}
 \label{partie-algo-voxels}
-La première étape du traitement du nuage de points est donc sa transformation en un nuage de voxels. Celle-ci a été implémentée dans le constructeur de la classe \texttt{VoxelCloud} du code Python proposé. Elle repose sur la première étape de l'algorithme 1 (page 1629) de \cite{aka_article} que nous détaillons dans la suite en l'enrichissant de clarifications utiles.
+La première étape du traitement du nuage de points est donc sa transformation en un nuage de voxels. Elle a été implémentée dans le constructeur de la classe \texttt{VoxelCloud} du code Python proposé. Elle repose sur la première étape de l'algorithme 1 (page 1629) de \cite{aka_article} que nous détaillons dans la suite en l'enrichissant de clarifications utiles et de suggestions d'amélioration.
 
-\TODO Définir $r$ : taille maximal de voxel / 2
-
-On procède avec l'heuristique suivante :
+\subsubsection*{Premier algorithme}
+Les voxels choisis par les auteurs sont parallélépipédiques rectangles (en anglais \emph{cuboids}). On commence par définir $s_\text{max}$ la taille maximale d'un voxel (dans chacune des trois dimensions de l'espace). La méthode proposée par les auteurs repose sur l'heuristique suivante :
 \begin{enumerate}
 	\item On commence par construire un \emph{arbre kd} des coordonnées du nuage de points ;
-	\item On sélectionne un point au hasard dans le nuage et on détermine son $r$-voisinage grâce à l'\emph{arbre kd}. On appelle $\mathcal{W}$ l'ensemble des points de ce voisinage qui n'ont pas déjà été inclus dans un voxel ;
+	\item On sélectionne un point au hasard dans le nuage et on détermine son $\frac{s_{\text{max}}}{2}$-voisinage grâce à l'\emph{arbre kd}. On appelle $\mathcal{W}$ l'ensemble des points de ce voisinage qui n'ont pas déjà été inclus dans un voxel ;
 	\item On détermine la plus petite boîte parallélépipédique $\mathcal{B}$ englobant les points de $\mathcal{W}$ ;
 	\item On définit un nouveau voxel $\V$ en sélectionnant tous les points du nuage qui sont contenus dans $\mathcal{B}$ et qui n'ont pas encore été inclus dans un autre voxel.
 	\item On retourne au point 2 jusqu'à ce qu'il n'y ait plus de points à sélectionner.
 \end{enumerate}
 
-Cet algorithme a l'inconvénient de sélectionner les centres des voxels au hasard : il est possible qu'il décide de prendre un point se trouvant juste à côté de deux voxels déjà sélectionnés. \textcolor{red}{Cette étape n'est pas à rédiger pour le moment car il est encore possible qu'elle change}. \TODO
-On pourrait soit échantillonner sur une grille régulière, soit regarder s'il y a un voxel pas loin quand on commence avec un nouveau point, soit faire un post-traitement.
+Cet algorithme converge nécessairement car le nombre de points qui restent sélectionnables décroît strictement à chaque itération (au moins un point est mis dans un voxel à chaque fois, celui sélectionné à l'étape 2). Malgré son efficacité, cet algorithme a cependant l'inconvénient de sélectionner les centres des voxels au hasard : il est possible qu'il décide de prendre un point se trouvant juste à côté de deux voxels déjà sélectionnés, ce qui amènera à des voxels de taille très diverses. 
 
+\subsubsection*{Version alternative}
+Pour pallier cet inconvénient, nous proposons une deuxième méthode alternative pour rééquilibrer les tailles des voxels : au lieu de sélectionner les points centraux au hasard, on échantillonne l'espace selon une grille régulière.
+
+\begin{enumerate}
+\item On construit un \emph{arbre kd} des coordonnées du nuage de points
+\item On échantillonne l'espace selon une grille dont les mailles sont de taille $s_\text{max} \times s_\text{max}\times s_\text{max}$ et on ne garde que les points de cette grille qui sont à une distance inférieure à $\sqrt{3}\ s_\text{max}$ d'au moins un point du nuage en utilisant l'\emph{arbre kd} défini précédemment. On note $\mathcal{C}$ les points de cette grille restants après cette étape et on construit un nouvel \emph{arbre kd} sur $\mathcal{C}$.
+\item On associe chaque point du nuage à l'élément de $\mathcal{C}$ le plus proche en effectuant une recherche du plus proche voisin grâce l'\emph{arbre kd} sur $\mathcal{C}$.
+\end{enumerate}
+
+La figure \ref{patate} compare les nuages de voxels obtenus après application des deux méthodes (commenter un peu).
+
+\subsubsection*{Post-traitement des voxels}
+Certains voxels obtenus après cette étape seront de taille trop petite pour être significative : il est par exemple impossible de définir une normale au voxel si celui-ci ne contient qu'un ou deux points. On décide donc de supprimer les voxels trop petits : si $A$ est un voxek possédant moins de $\kappa$ points, on associe ses points au voxel $B$ le plus proche si la taille de $B$ le permet %TODO Préciser.
+On met de côté les points qu'on est incapable d'associer à un voxel suffisamment gros : la figure \ref{banane} présente le résultat après cette étape (croix noires, etc.)
 \subsection{Calcul des caractéristiques des voxels}
 Une fois les points composant chaque voxel déterminés, il est possible de calculer les caractéristiques locales en associant à chaque voxel $\V$:
 
@@ -89,31 +101,59 @@ Une fois les points composant chaque voxel déterminés, il est possible de calc
 
 On a noté avec des flèches $\overrightarrow{\cdot}$ les quantités vectorielles, sur lesquelles on sera amené par la suite à effectuer des opérations (comparaison, somme, ...) terme à terme.
 
-Il est bien entendu possible de calculer d'autres caractéristiques (\textcolor{red}{c'est d'ailleurs en tests}) \TODO
+Il est bien entendu également possible de calculer d'autres caractéristiques comme la planarité ou la linéarité de chaque voxel. Ces caractéristiques pourront par exemple être utilisées ultérieurement lors de la classification.
 
 \section{Voisinage dans l'espace des voxels et segmentation}
-On propose dans cette partie une nouvelle lecture de la méthode \emph{link-chain} proposée dans \cite{aka_article} en l'interprétant comme la détection de composantes connexes dans un graphe dont les arêtes dont définies par une nouvelle relation de voisinage mélangeant informations spatiale et colorimétrique.
+L'étape suivante proposée dans \cite{aka_article} est la segmentation des voxels pour en déduire des objets qui pourront ensuite être classifiés. On propose dans cette partie une nouvelle lecture de la méthode \emph{link-chain} proposée dans l'article en l'interprétant comme la détection de composantes connexes dans un graphe dont les arêtes dont définies par une nouvelle relation de voisinage mélangeant informations spatiale et colorimétrique. 
+
 
 \subsection{Condition de voisinage}
+\label{condvoisinage}
 On se place dans l'ensemble $\mathcal{Z} = \{\mathcal{V}\}$ des voxels que l'on munit d'une relation de voisinage grâce aux caractéristiques des voxels calculées précédemment.
 
 Soit $A, B \in \mathcal{Z}$ deux voxels et $c_D > 0$. On dit que $A$ et $B$ sont $c_D$-voisins, et on note $A \sim_{c_D} B$ si :
 
 \begin{align}
-\left|\overrightarrow{p_A} - \overrightarrow{p_B}\right| &\leq c_D\overrightarrow{1} + \frac{1}{2} \left(\overrightarrow{s_A} + \overrightarrow{s_B}\right)\\
-\left|\overrightarrow{\mu_A^c} - \overrightarrow{\mu_B^c}\right| &\leq 3 \max\left(\overrightarrow{\sigma_A^c}, \overrightarrow{\sigma_B^c}\right)\\
-\left|\mu_A^i - \mu_B^i\right| &\leq 3 \max\left(\sigma_A^i, \sigma_B^i\right)
+\left|\overrightarrow{p_A} - \overrightarrow{p_B}\right| &\leq c_D\overrightarrow{1} + \frac{1}{2} \left(\overrightarrow{s_A} + \overrightarrow{s_B}\right)\label{cond1}\\
+\left|\overrightarrow{\mu_A^c} - \overrightarrow{\mu_B^c}\right| &\leq 3 \max\left(\overrightarrow{\sigma_A^c}, \overrightarrow{\sigma_B^c}\right)\label{cond2}\\
+\left|\mu_A^i - \mu_B^i\right| &\leq 3 \max\left(\sigma_A^i, \sigma_B^i\right)\label{cond3}
 \end{align}
-
-
-\TODO Ajouter un paragraphe sur l'interprétation des conditions dans la relation d'équivalence (pourquoi somme des tailles, pourquoi facteur $c_D$ [sur ce point, revoir l'article], etc)
-
-\TODO L'article dit que les normales ne sont pas considérées ici pour travailler directement sur les entités plutôt que sur les surfaces planes. Le mentionner ?
 
 On remarque immédiatement que cette relation est symétrique : $A \sim_{c_D} B \Leftrightarrow B \sim_{c_D} A$. On peut alors munir notre ensemble $\mathcal{Z}$ d'arêtes pour former un graphe non-orienté dont on détermine ensuite les composantes connexes.
 
+\paragraph*{Interprétation des conditions}
+\begin{itemize}
+\item Condition (\ref{cond1}) : les centres des deux voxels doivent être séparés d'au plus la moyenne des tailles des deux voxels, plus un facteur correctif $c_D$ permettant d'élargir la taille des voisinages (par exemple en cas de de nuage peu dense). Ainsi, à distance inter-centre constante, $A$ et $B$ seront voisins s'ils sont suffisamment gros. S'ils sont peu étendus dans la direction de la droite reliant les centres, on retiendra l'hypothèse qu'ils ne sont pas voisins.
+\item Condition (\ref{cond2}) : la différence de couleur doit être inférieure à trois fois le plus grand écart-type. Ainsi, si une zone a une forte variabilité colorimétrique (écart-type grand), la condition sera plus permissive que si les points sont tous strictement de la même couleur.
+\item Condition (\ref{cond3}) : elle s'interprète exactement comme la condition (\ref{cond2}).
+\end{itemize}
+
 \subsection{Recherche des composantes connexes}
-La recherche des composantes connexes pourrait se faire de façon naïve en $\mathcal{O}(|\mathcal{Z}|^2)$ en parcourant l'ensemble $\mathcal{Z}$ pour chaque voxel et en vérifiant s'ils vérifient ou non la condition de voisinage. Toutefois, on peut considérablement alléger les calculs en restreignant la vérification de la condition aux points spatialement proches et en utilisant un \emph{arbre kd}.
+La recherche des composantes connexes pourrait se faire de façon naïve en $\mathcal{O}(|\mathcal{Z}|^2)$ en parcourant l'ensemble $\mathcal{Z}$ pour chaque voxel et en vérifiant s'ils vérifient ou non la condition de voisinage. Toutefois, on peut considérablement alléger les calculs en restreignant la vérification de la condition aux points spatialement proches et en utilisant pour ceci un \emph{arbre kd}. Il suffit alors d'effectuer un parcours en profondeur du graphe défini par la relation de voisinage du paragraphe précédent. Les détails de la méthode sont présentés dans la fonction \texttt{compute\_connected\_components} de la classe \texttt{VoxelCloud} \TODO Vérifier le nom de la fonction
+
+\subsection{Segmentation du sol}
+Les composantes connexes obtenues par cette méthode ne sont pas immédiatement satisfaisantes car encore trop peu segmentées, comme on peut le voir à l'image \ref{poireau}. Le sol a tendance à agir comme un pont entre les objets et la modification des conditions de voisinage a pour effet soit de sur-segmenter certaines zones soit d'en sous-segmenter d'autres. L'article propose cependant une méthode permettant de régler ce problème : il inclut une information \emph{a priori} sur le nuage de points : celle que la scène étudiée comporte un sol relativement plat et étendu. Parvenir à éliminer le sol permet alors de segmenter correctement les objets restants avant de les classifier.
+La méthode employée par les auteurs pour segmenter le sol repose sur un seuillage de la valeur de l'orientation des normales avec l'axe vertical (voir page 1632). Cette méthode ne nous a pas paru totalement satisfaisante car nos jeux de données pouvaient avoir des pentes importantes. Nous avons donc choisi à la place d'utiliser l'algorithme RANSAC \cite{ransac}. Les détails d'implémentation peuvent être analysés dans le fichier \texttt{ransac.py} \TODO Nom de fichier ?
+
+\subsection{Méthodes alternatives de recherche des composantes connexes}
+La méthode proposée ici se place dans un contexte extérieur, suppose que le sol est relativement plat et que les objets  peuvent être séparés aisément dès que le sol est retiré du nuage de voxels. Nous nous sommes cependant posé la question de l'efficacité de la méthode dans d'autres contextes : il est probable que la présence de nombreux objets entremêlés ou un sol irrégulier peuvent considérablement détériorer les performances de la segmentation, qui est pourtant une étape cruciale avant de pouvoir effectuer la classification. Nous avons donc réfléchi (sans aboutir encore à une solution définitive) à deux méthodes alternatives : l'une non supervisée basée sur le partitionnement spectral du graphe d'adjacence et l'autre supervisée basée sur des méthodes de \TODO cf Guillaume.
+
+\subsubsection{Partitionnement spectral}
+Les auteurs de \cite{aka_article} mentionnent dans leur revue de littérature la possibilité d'effectuer un partitionnement de graphe, en citant notamment l'article \cite{mincut}. Nous avons repris l'idée en étendant la matrice d'adjacence définie par la condition de voisinage du paragraphe \ref{condvoisinage} pour avoir des entrées moins brutales qu'une simple matrice binaire indiquant si les points sont voisins ou non. On construit à la place une matrice de similarité indiquant le degré de proximité des voxels du nuage. On en déduit le laplacien du graphe associé, que l'on peut ensuite diagonaliser. Un partitionnement non-supervisé (par exemple avec l'algorithme \emph{k-moyennes} ou bien un mélange de gaussiennes) permet de déduire un partitionnement du graphe. On se reportera à \cite{spectralclustering} pour plus de détails, ou à l'implémentation encore expérimentale de la méthode dans la fonction \texttt{todo} \TODO.
+
+La méthode possède encore plusieurs inconvénients. Elle nécessite de connaître \emph{a priori} le nombre d'objets à segmenter, elle est très coûteuse en calculs (avec notamment une diagonalisation d'une matrice ayant la même taille que le nombre de voxels) et elle nécessite de trouver une fonction de similarité suffisamment satisfaisante pour le problème considéré. Des solutions sont envisageables pour chacun de ces problèmes, mais leur étude nécessitera du temps.
+
+\subsubsection{Méthode Guillaume}
+
+\subsection{Classification}
+La dernière étape de la méthode est enfin la classification du nuage de points.
+
+\subsubsection{Méthode}
+
+
+\subsubsection{Métrique et résultats}
+
+
 
 \section{Données, résultats et conclusion}
 \subsection{Implémentation}
