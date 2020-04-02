@@ -8,7 +8,8 @@ from RANSAC import RANSAC, in_plane
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 import time
-
+from scipy import sparse
+from sklearn.cluster import SpectralClustering
 
 class VoxelCloud:
     def __init__(self, pointcloud, max_voxel_size = 0.3, min_voxel_length = 4, threshold_grow = 1.5, method = "regular", seed = 42):
@@ -324,8 +325,10 @@ class VoxelCloud:
         return sim[0] if isnum else sim
     
     def build_similarity_graph(self, c_D, weights):
-        A = np.zeros((len(self), len(self)))
-        D = np.zeros((len(self), len(self)))
+        # A = np.zeros((len(self), len(self)))
+        # D = np.zeros((len(self), len(self)))
+        A = sparse.lil_matrix((len(self), len(self)))
+        D = sparse.lil_matrix((len(self), len(self)))
         
         neighbours = []
         idxs = list(range(len(self)))
@@ -336,12 +339,14 @@ class VoxelCloud:
             D[i,i] = np.sum(similarity)
             
         return A, D
-    
+        
     def find_connected_components_similarity(self, c_D, weights, K):
+        print("Building similarity graph")
         A, D = self.build_similarity_graph(c_D, weights)
         L = D - A
         print("Finding the eigendecomposition of the Laplacian graph... This may require time.")
-        eigenvalues, eigenvectors = np.linalg.eigh(L)
+        eigenvalues, eigenvectors = sparse.linalg.eigsh(L, k=K)
+        # eigenvalues, eigenvectors = np.linalg.eigh(L)
         print("Successfully diagonalized Laplacian matrix")
         gm = GaussianMixture(K)
         lbl = gm.fit_predict(eigenvectors[:,:K])
@@ -354,6 +359,30 @@ class VoxelCloud:
         
         return components
         
+    def find_connected_components_similarity_v2(self, c_D, weights, K):
+        
+        print("Building similarity matrix")
+        A = sparse.lil_matrix((len(self), len(self)))
+        neighbours = []
+        idxs = list(range(len(self)))
+        potential = self.find_spatial_neighbours(idxs, c_D)
+        for i in range(len(self)):
+            similarity = self.similarity(i, potential[i], c_D, weights)
+            A[i, potential[i]] = similarity
+        A = A.tocsr()
+        
+        print("Spectral clustering")
+        clustering = SpectralClustering(n_clusters = K, affinity = "precomputed", assign_labels = "kmeans", random_state=0, n_jobs = -1)
+        lbl = clustering.fit_predict(A)
+        
+        print("Attributing components")
+        components_idx = np.unique(lbl)
+        components = []
+        
+        for i in components_idx:
+            components.append(np.where(lbl == i)[0])
+        
+        return components
     
     def find_spatial_neighbours(self, idxs, c_D, exclude_self = True):
         """

@@ -8,10 +8,11 @@ Created on Sat Mar 28 16:16:52 2020
 import numpy as np
 from descriptors import local_PCA
 from sklearn.neighbors import KDTree
+from sklearn.metrics import confusion_matrix
 
 class ComponentCloud:
     
-    def __init__(self, voxelcloud, c_D = 0.25, method = "normal", K = 15, segment_out_ground=False, min_component_length=1):
+    def __init__(self, voxelcloud, c_D = 0.25, method = "normal", K = 15, segment_out_ground = False, min_component_length = 1):
         """
             Builds a cloud of connected component from a voxel cloud
     
@@ -155,9 +156,10 @@ class ComponentCloud:
         """
         self.predicted_label = predicted_label
     
-    def eval_classification_error(self, idx = None, ground_truth_type = "pointwise", include_unassociated_points=False):
+    def eval_classification_error(self, idx = None, ground_truth_type = "pointwise", include_unassociated_points = False, classes = None):
         """
             Computes the classification error for one ore several components in the cloud
+            and returns the confusion matrix if classes are provided
         """
         if type(idx) is int:
             idx = [idx]
@@ -215,6 +217,9 @@ class ComponentCloud:
         correct = np.sum(ground_truth == predicted) / len(predicted)
         
         print(f"{correct * 100:.2f}% correctly classified [{ground_truth_type}, {len(predicted)} samples {'(including unassociated points)' if include_unassociated_points else ''}]")
+        
+        if classes is not None:
+            return confusion_matrix(ground_truth, predicted, classes)
             
     
     def get_all_3D_points_of_component(self, i):

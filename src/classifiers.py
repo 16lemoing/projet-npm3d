@@ -10,7 +10,7 @@ from sklearn import preprocessing
 
 class ComponentClassifier:
     
-    def __init__(self, classifier_type, classifier_kwargs, scale_data=False):
+    def __init__(self, classifier_type, classifier_kwargs, scale_data = False):
         """
             Build a classifier based from one or multiple ComponentCloud objects
     

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-
+import itertools
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import cm
@@ -127,4 +127,30 @@ def plot(cloud, idxs = None, colors = None, only_voxel_center = True, also_unass
         if len(data) > 0:
             ax.plot(data[:,0], data[:,1], data[:,2], 'o', c='black')
     
+    plt.show()
+
+def plot_confusion_matrix(cm, classes, data_type=""):
+    
+    tot_gt = np.sum(cm, axis=1)
+    n_cm = (cm.T / tot_gt).T
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    cax = ax.matshow(n_cm)
+    plt.title(f"Confusion matrix of the classifier on {data_type} data (all points)")
+    fig.colorbar(cax)
+    ax.set_xticklabels([''] + classes)
+    ax.set_yticklabels([''] + classes)
+    ax.tick_params(axis='both', which='major', labelsize=8)
+    ax.xaxis.set_ticks_position('bottom')
+    for tick in ax.get_xticklabels():
+        tick.set_rotation(45)
+    plt.xlabel('Predicted')
+    plt.ylabel('Ground truth')
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, f"{int(cm[i, j])}",
+                horizontalalignment="center",
+                color="white" if n_cm[i,j] < 0.5 else "black",
+                fontsize=6)
+    plt.tight_layout()
     plt.show()
