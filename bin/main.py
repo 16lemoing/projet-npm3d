@@ -16,7 +16,7 @@ from plots import plot, plot_confusion_matrix
 from pointcloud import PointCloud
 from voxelcloud import VoxelCloud
 from componentcloud import ComponentCloud
-from classifiers import ComponentClassifier
+from classifiers import NeighbourhoodClassifier, ComponentClassifier
 
 # %% Make ply files for clouds
 
@@ -88,10 +88,38 @@ segment_out_ground = True
 threshold_in = 1 # for ground detection
 threshold_normals = 0.8 # for ground detection
 min_component_length = 5
+use_neighbourhood_classifier = False
+train_vc_files_for_classifier = ["bildstein3.pkl", "domfountain2.pkl"]
+classifier_type = 'SGD'
+classifier_kwargs = {}
+scale_data = True
 
 if not os.path.exists(cc_backup_folder):
     os.makedirs(cc_backup_folder)
 
+# Train neighbourhood classifier if needed
+if use_neighbourhood_classifier:
+    
+    # Retrieve voxel clouds from training set
+    print("Loading voxel clouds for training neighbourhood classifier")
+    train_vc = []
+    for filename in train_vc_files_for_classifier:
+        pkl_file = os.path.join(vc_backup_folder, filename)
+        with open(pkl_file, 'rb') as handle:
+            vc = pickle.load(handle)
+            train_vc.append(vc)
+            
+    # Declare classifier
+    print("Constructing neighbourhood classifier")
+    neighbourhood_classifier = NeighbourhoodClassifier(classifier_type, classifier_kwargs, scale_data, c_D, segment_out_ground, threshold_in, threshold_normals)
+    
+    # Train classifier
+    print("Training neighbourhood classifier")
+    neighbourhood_classifier.fit(train_vc)
+else:
+    neighbourhood_classifier = None
+        
+# Create Component Cloud objects
 for pkl_file in glob(os.path.join(vc_backup_folder, "*.pkl")):
     backup_file = os.path.join(cc_backup_folder, os.path.basename(pkl_file))
     if overwrite or not os.path.exists(backup_file):
@@ -100,6 +128,10 @@ for pkl_file in glob(os.path.join(vc_backup_folder, "*.pkl")):
         # Retrieve voxel cloud
         with open(pkl_file, 'rb') as handle:
             vc = pickle.load(handle)
+        
+        # Assign trained neighbourhood classifier to voxel cloud
+        # If 'neighbourhood_classifier' is None, standard neighbourhood criteria (from paper) will be applied
+        vc.set_neighbourhood_classifier(neighbourhood_classifier)
         
         # Compute component cloud
         cc = ComponentCloud(vc, c_D = c_D, segment_out_ground = segment_out_ground, threshold_in = threshold_in, threshold_normals = threshold_normals, min_component_length = min_component_length)
