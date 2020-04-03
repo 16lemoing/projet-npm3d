@@ -10,7 +10,7 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 from utils.ply import read_ply, write_ply, make_ply
-from plots import plot
+from plots import plot, plot_confusion_matrix
 from pointcloud import PointCloud
 from voxelcloud import VoxelCloud
 from componentcloud import ComponentCloud
@@ -21,6 +21,7 @@ name = "bildstein5_extract.ply"
 ply_file = Path("..") / "data" / "relabeled_clouds" / name
 test_backup_folder = Path("..") / "data" / "backup" / "test"
 test_backup_folder.mkdir(exist_ok = True)
+
 
 c_D = 0.25
 segment_out_ground = True

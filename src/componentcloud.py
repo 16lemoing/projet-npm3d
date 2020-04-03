@@ -12,10 +12,13 @@ from sklearn.metrics import confusion_matrix
 
 class ComponentCloud:
     
+
     def __init__(self, voxelcloud, c_D = 0.25, 
                  method = "normal", K = 15, 
-                 segment_out_ground = False, 
+                 segment_out_ground = False,
+                 threshold_in = 1, threshold_normals = 0.8,
                  min_component_length = 1):
+        
         """
             Builds a cloud of connected component from a voxel cloud
     
@@ -34,7 +37,7 @@ class ComponentCloud:
             self.components = self.voxelcloud.find_connected_components_similarity(self.c_D, weights = [1,1,1], K = K)
             self.too_small_components = []
         else:
-            self.components, self.too_small_components = self.voxelcloud.compute_connected_components(self.c_D, segment_out_ground, min_component_length)
+            self.components, self.too_small_components = self.voxelcloud.compute_connected_components(self.c_D, segment_out_ground, threshold_in, threshold_normals, min_component_length)
         
         # Initializes and declares features
         self.nb_points = np.ones(len(self), dtype=int)
