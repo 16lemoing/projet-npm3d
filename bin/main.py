@@ -119,7 +119,7 @@ test_cc_files = ["bildstein5.pkl", "neugasse.pkl", "untermaederbrunnen1.pkl"]
 classes = {2: "terrain", 3: "high vegetation", 4: "low vegetation", 5: "buildings", 6:"hard scape", 7:"scanning artefacts", 8:"cars"}
 classifier_type = 'random_forest'
 classifier_kwargs = {'n_estimators': 20}
-scale_data = True
+scale_data = False
 
 if not os.path.exists(pc_backup_folder):
     os.makedirs(pc_backup_folder)
@@ -164,7 +164,9 @@ for i, cc in enumerate(test_cc):
     cc.set_predicted_labels(cc_classifier.predict(cc))
     cc.eval_classification_error(ground_truth_type = "componentwise")
     cc.eval_classification_error(ground_truth_type = "pointwise")
-    cm += cc.eval_classification_error(ground_truth_type = "pointwise", include_unassociated_points=True, classes = np.array(list(classes.keys())))
+    this_cm = cc.eval_classification_error(ground_truth_type = "pointwise", include_unassociated_points=True, classes = np.array(list(classes.keys())))
+    plot_confusion_matrix(this_cm, list(classes.values()), data_type = test_cc_files[i])
+    cm += this_cm
 plot_confusion_matrix(cm, list(classes.values()), data_type = 'test')
 
 # Save train results (predicted components, predicted labels, groundtruth labels)
