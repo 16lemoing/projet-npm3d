@@ -12,7 +12,10 @@ from sklearn.metrics import confusion_matrix
 
 class ComponentCloud:
     
-    def __init__(self, voxelcloud, c_D = 0.25, method = "normal", K = 15, segment_out_ground = False, min_component_length = 1):
+    def __init__(self, voxelcloud, c_D = 0.25, 
+                 method = "normal", K = 15, 
+                 segment_out_ground = False, 
+                 min_component_length = 1):
         """
             Builds a cloud of connected component from a voxel cloud
     

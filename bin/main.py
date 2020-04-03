@@ -45,6 +45,8 @@ vc = VoxelCloud(
     method = "regular"
 )
 
+plot(vc)
+
 cc = ComponentCloud(
     voxelcloud = vc, 
     c_D = 0.25,
@@ -53,6 +55,8 @@ cc = ComponentCloud(
     K = 1,
     min_component_length = 1
 )
+
+plot(cc, colors = np.array([0] + (len(cc) - 1) * [1]))
 
 # Save component cloud
 print("Saving component cloud for display")
