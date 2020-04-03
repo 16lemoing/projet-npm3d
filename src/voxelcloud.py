@@ -420,7 +420,7 @@ class VoxelCloud:
             
         return neighbours    
     
-    def compute_connected_components(self, c_D, segment_out_ground, min_component_length):
+    def compute_connected_components(self, c_D, segment_out_ground, threshold_in, threshold_normals, min_component_length):
         """
             Builds a list of connected components of voxels from a voxelcloud object,
             by performing a depth first search by using the neighbourhood condition
@@ -446,8 +446,6 @@ class VoxelCloud:
         # Segment out the ground
         if segment_out_ground:
             NB_RANDOM_DRAWS = 1000
-            threshold_in = 1
-            threshold_normals = 0.8
             best_ref_pt, best_normal = RANSAC(self.features['geometric_center'], self.features['normal'], NB_RANDOM_DRAWS, threshold_in, threshold_normals)
             ground_mask = in_plane(self.features['geometric_center'], self.features['normal'], best_ref_pt, best_normal, threshold_in, threshold_normals)
             ground_idxes = indices[ground_mask]

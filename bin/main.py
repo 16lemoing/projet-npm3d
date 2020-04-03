@@ -12,7 +12,7 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 from utils.ply import read_ply, write_ply, make_ply
-from plots import plot
+from plots import plot, plot_confusion_matrix
 from pointcloud import PointCloud
 from voxelcloud import VoxelCloud
 from componentcloud import ComponentCloud
@@ -82,9 +82,11 @@ for ply_file in glob(os.path.join(relabeled_clouds_folder, "*.ply")):
 # Parameters
 vc_backup_folder = "../data/backup/voxel_cloud"
 cc_backup_folder = "../data/backup/component_cloud"
-overwrite = False
+overwrite = True
 c_D = 0.25
 segment_out_ground = True
+threshold_in = 1 # for ground detection
+threshold_normals = 0.8 # for ground detection
 min_component_length = 5
 
 if not os.path.exists(cc_backup_folder):
@@ -100,7 +102,7 @@ for pkl_file in glob(os.path.join(vc_backup_folder, "*.pkl")):
             vc = pickle.load(handle)
         
         # Compute component cloud
-        cc = ComponentCloud(vc, c_D = c_D, segment_out_ground = segment_out_ground, min_component_length = min_component_length)
+        cc = ComponentCloud(vc, c_D = c_D, segment_out_ground = segment_out_ground, threshold_in = threshold_in, threshold_normals = threshold_normals, min_component_length = min_component_length)
         
         # Save component cloud
         with open(backup_file, 'wb') as handle:
@@ -153,27 +155,19 @@ for i, cc in enumerate(train_cc):
     cc.eval_classification_error(ground_truth_type = "componentwise")
     cc.eval_classification_error(ground_truth_type = "pointwise")
     cm += cc.eval_classification_error(ground_truth_type = "pointwise", include_unassociated_points = True, classes = np.array(list(classes.keys())))
+plot_confusion_matrix(cm, list(classes.values()), data_type = 'train')
 
-fig = plt.figure()
-ax = fig.add_subplot(111)
-cax = ax.matshow(cm)
-plt.title('Confusion matrix of the classifier on train data')
-fig.colorbar(cax)
-ax.set_xticklabels([''] + classes.values())
-ax.set_yticklabels([''] + classes.values())
-plt.xlabel('Predicted')
-plt.ylabel('True')
-plt.show()
-
-    
 # Evaluate classifier on test data
-confusion_matrix = np.zeros((len(classes), len(classes)))
+cm = np.zeros((len(classes), len(classes)))
 for i, cc in enumerate(test_cc):
     print(f"Evaluation of [TEST DATA] {test_cc_files[i]}")
     cc.set_predicted_labels(cc_classifier.predict(cc))
-    cc.eval_classification_error(ground_truth_type = "pointwise")
-    cc.eval_classification_error(ground_truth_type = "pointwise", include_unassociated_points=True)
     cc.eval_classification_error(ground_truth_type = "componentwise")
+    cc.eval_classification_error(ground_truth_type = "pointwise")
+    this_cm = cc.eval_classification_error(ground_truth_type = "pointwise", include_unassociated_points=True, classes = np.array(list(classes.keys())))
+    plot_confusion_matrix(this_cm, list(classes.values()), data_type = test_cc_files[i])
+    cm += this_cm
+plot_confusion_matrix(cm, list(classes.values()), data_type = 'test')
 
 # Save train results (predicted components, predicted labels, groundtruth labels)
 print("Saving train results")
@@ -202,22 +196,6 @@ for i, cc in enumerate(test_cc):
 print("Done")
 
 # %%
-import sys
-sys.path.append("..\\src") # Windows
-sys.path.append("../src") # Linux
-from glob import glob
-import pickle
-import os
-import time
-import random
-import matplotlib.pyplot as plt
-import numpy as np
-from utils.ply import read_ply, write_ply, make_ply
-from plots import plot
-from pointcloud import PointCloud
-from voxelcloud import VoxelCloud
-from componentcloud import ComponentCloud
-from classifiers import ComponentClassifier
 
 # Parameters
 pkl_file = "../data/backup/voxel_cloud/untermaederbrunnen1.pkl"
