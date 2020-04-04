@@ -5,7 +5,6 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
-import os
     
 # def plot_voxels(voxelcloud, idxs = None, colors = None, only_voxel_center = False, also_unassociated_points = False):
 #     """
@@ -154,4 +153,4 @@ def plot_confusion_matrix(cm, classes, data_type, id, folder):
                 color="white" if n_cm[i,j] < 0.5 else "black",
                 fontsize=6)
     plt.tight_layout()
-    plt.savefig(os.path.join(folder, f"{id}_{data_type}.png"))
+    plt.savefig(str(folder / f"{id}_{data_type}.png"))

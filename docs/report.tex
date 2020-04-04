@@ -144,19 +144,30 @@ Les auteurs de \cite{aka_article} mentionnent dans leur revue de littérature la
 La méthode possède encore plusieurs inconvénients. Elle nécessite de connaître \emph{a priori} le nombre d'objets à segmenter, elle est très coûteuse en calculs (avec notamment une diagonalisation d'une matrice ayant la même taille que le nombre de voxels) et elle nécessite de trouver une fonction de similarité suffisamment satisfaisante pour le problème considéré. Des solutions sont envisageables pour chacun de ces problèmes, mais leur étude nécessitera du temps.
 
 \subsubsection{Apprentissage supervisé}
-Une autre méthode alternative que nous avons essayée est d'apprendre de manière supervisée la relation de voisinage entre voxels. L'objectif était d'avoir une condition d'association de voxels voisins plus robuste que celle proposée dans \cite{aka_article} en reposant sur un plus grand nombre de paramètres et en adaptant les critères de décision à la nature du nuage de point (il n'exite pas a priori une méthode de segmentation qui fonctionnerait pour tout type de nuage de points). La méthode proposée cherche, à partir d'un vecteur de paramètres qui qualifient une paire de voxels (delta des couleurs, de la réflectance laser, du centre géométrique ou encore de la planarité, verticalité, sphéricité, linéarité...), à déterminer si deux voxels sont voisins. Dans cette étude nous considérons que deux voxels sont voisins si d'une part ils sont assez proches et d'autre part s'ils partagent le même label avec un seuil de pureté acceptable (i.e.\ le label dominant doit être partagé par au moins un certain pourcentage des pixels à l'intérieur du voxel). Il faut alors entrainer un classifieur binaire. Comme les données d'entrainement sont en très grand nombre, nous avons fait le choix d'un classifieur \emph{Support Vector Machine} (SVM)  reposant sur la \emph{descente de gradient stochastique} (SGD).
-
-Les voxels proches étant souvent voisins (dans le sens défini ci-dessus), il y avait un grand déséquilibre dans les données d'entrainement entre les deux classes (voisin / pas voisin). Ceci peut être néfaste pour l'entrainement. Nous avons donc procédé à un rééquilibrage des données lors de l'apprentissage. Une difficulté que nous ne sommes pas parvenus à résoudre est que parmi les voxels du nuage d'entrainement, la performance du classifieur binaire ne parvient pas à dépasser un seuil (une précision de 93\%). Nous suspectons que certaines paires de voxels puissent avoir des vecteurs de paramètres très similaires mais une relation de voisinage différente. Auquel cas cette approche, tout comme celle de \cite{aka_article} ne peut y remédier, à moins d'ajouter plus de paramètres discriminatoires. Ce que nous n'avons pas encore essayé.
+Une autre méthode alternative que nous avons essayée est d'apprendre de manière supervisée la relation de voisinage entre voxels. L'objectif était d'avoir une condition d'association de voxels voisins plus robuste que celle proposée dans \cite{aka_article} en reposant sur un plus grand nombre de paramètres et en adaptant les critères de décision à la nature du nuage de point (il n'exite pas a priori une méthode de segmentation qui fonctionnerait pour tout type de nuage de points). La méthode proposée cherche, à partir d'un vecteur de paramètres qui qualifient une paire de voxels (delta des couleurs, de la réflectance laser, du centre géométrique ou encore de la planarité, verticalité, sphéricité, linéarité...), à déterminer si deux voxels sont voisins. Dans cette étude nous considérons que deux voxels sont voisins si d'une part ils sont assez proches et d'autre part s'ils partagent le même label avec un seuil de pureté acceptable (i.e.\ le label dominant doit être partagé par au moins un certain pourcentage des pixels à l'intérieur du voxel). Il faut alors entrainer un classifieur binaire. Considérer l'ensemble des paires de voxels possibles n'est pas très judicieux car la notion de voisinage n'a un sens que si les voxels sont proches. Pour restreindre le nombre de paires, nous avons donc choisi de préfiltrer les paires en appliquant la condition sur les distances mentionnée dans  \cite{aka_article}. De plus, comme notre méthode de ségmentation s'appuie sur le filtrage du sol, il n'y a pas d'intérêt à apprendre ce qu'est la relation de voisinage pour les voxels du sol (d'autant plus que ceux-ci sont en grand nombre et pourraient polluer l'apprentissage). Nous faisons donc le choix de filtrer les voxels du sol avant de sélectionner les paires. Les composantes connexes étant assez denses, des voxels proches sont souvent voisins (dans le sens défini ci-dessus), il y avait donc un grand déséquilibre dans les données d'entrainement entre les deux classes (voisin / pas voisin). Ceci peut être néfaste pour l'entrainement. Nous avons donc procédé à un rééquilibrage des classes (voisin / non voisin) en amont de l'apprentissage. Nous avons choisi come classifieur un \emph{Random Forest} (forêt d'arbres décisionnels) composée de $20$ arbres de décision. Une fois le classifieur de voisinage appris, nous pouvons appliquer cette relation de voisinage à de nouveaux nuages de points et ainsi déterminer les composantes connexes de ces nuages.
 
 \subsection{Classification}
-La dernière étape de la méthode est enfin la classification du nuage de points.
+La dernière étape de la méthode est enfin la classification des composantes connexes du nuage de points. 
 
 \subsubsection{Méthode}
+La méthode de classification introduite par \cite{aka_article} étant peu détaillée et reposant sur des seuils arbitrairement choisis, nous avons décidé d'appuyer notre méthode sur les mêmes pararmètres (que nos avons d'ailleurs enrichis) et d'apprendre de manière supervisée la classification des composantes connexes. Pour reprendre les catégories de paramètres spécifiées dans \cite{aka_article}, nous avons considéré les paramètres liés :
+\begin{itemize}
+\item Aux normales : la moyenne et la variance de la projection des normales des voxels de la composante connexe sur l'axe z ainsi que sur le plan défini par les axes x et y.
+\item Au centre géométrique et au barycentre : le centre géométrique de la composante connexe calculé à partir de l'ensemble des voxels de celle-ci, même chose pour le barycentre.
+\item A la couleur et l'intensité : la moyenne et la variance des couleurs et de la relfectance laser des voxels de la composante connexe.
+\item A la forme géomtétrique : les valeurs propres et vecteurs de la \emph{Principal Component Analysis} (PCA) des centres géométriques des voxels de la composante connexe, la moyenne de la verticalité, linéarité, planarité et sphéricité  des voxels de la composante connexe, le nombre de voxels dans la composante connexe et la taille de la composante connexe.
+\end{itemize}
+La taille des données s'y prétant bien, nous avons choisi comme classifieur un \emph{Random Forest} (forêt d'arbres décisionnels) composée de $20$ arbres de décision.
+\subsubsection{Métrique}
 
+Afin dévaluer la pertinence de notre méthode nous proposons plusieurs métriques.
 
-\subsubsection{Métrique et résultats}
-
-
+Tout d'abord des calculs de précision :
+\begin{itemize}
+\item \textbf{Au niveau des composantes connexes} On attribue à l'ensemble des points de chaque composante connexe un unique label par vote de majorité sur les voxels qui la constitue. En effet, la ségmentation n'étant pas toujours parfaite il se peut que des voxels de différents labels se retrouvent ségmentés dans un même objet. On compare ensuite ce label de vérité terrain obtenu par vote au label prédit par le classifieur en chacun des points. Cette métrique permet de comparer la classification prédite à la meilleure classification possible en vue de la ségmentation obtenue. Ainsi on peut évaluer la classification en se soustrayant des problèmes introduits par une mauvaise ségmentation.
+\item \textbf{Au niveau des points}
+\end{itemize}
+La taille des donné
 
 \section{Données, résultats et conclusion}
 \subsection{Implémentation}
@@ -169,7 +180,7 @@ L'implémentation de la méthode a été réalisée en Python. Elle est disponib
 Cette implémentation reprend quelques éléments du code de Hugues Thomas\footnote{\url{mailto:huguesthomas218@gmail.com}} pour ce qui concerne le chargement et l'écriture de fichiers \texttt{.ply} représentant les nuages de points.
 
 \subsection{Données}
-Les données mentionnées en 2013 dans l'article \cite{aka_article} n'étant plus disponibles en ligne en 2020, nous avons travaillé sur le jeu de données \texttt{reduced-8} de \href{http://www.semantic3d.net/}{\emph{Semantic3D}} \cite{hackel2017isprs}. Celles-ci ont l'avantage de comporter non seulement les données d'intensité de réflectance laser mais aussi de couleur RGB de chaque point, en plus d'être partiellement classifiées. Ce dernier point nous a permis de mettre en place une méthode de classification par apprentissage.
+Les données mentionnées en 2013 dans l'article \cite{aka_article} n'étant plus disponibles en ligne en 2020, nous avons travaillé sur le jeu de données \texttt{semantic-8} de \href{http://www.semantic3d.net/}{\emph{Semantic3D}} \cite{hackel2017isprs}. Celles-ci ont l'avantage de comporter non seulement les données d'intensité de réflectance laser mais aussi de couleur RGB de chaque point, en plus d'être partiellement classifiées. Ce dernier point nous a permis de mettre en place une méthode de classification par apprentissage.
 Nous avons réalisé nos expérimentations sur une version réduite du nuage \texttt{bildstein5} avant d'apprendre (\TODO en fonction de ce qui sera fait).
 Une représentation de ce nuage est présentée à la figure \ref{tomate}.
 
@@ -177,6 +188,10 @@ Une représentation de ce nuage est présentée à la figure \ref{tomate}.
 \caption{Nuage de points \texttt{bildstein5} du jeu de données \emph{Semantic3D}}
 \label{tomate}
 \end{figure}
+
+\subsection{Résultats}
+
+\subsection{Conclusion}
 
 \nocite{*}
 \bibliographystyle{plain}
