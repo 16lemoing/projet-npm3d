@@ -424,30 +424,46 @@ class VoxelCloud:
             isnum = True
             j = [j]
         
+        max_z = np.maximum(self.features['geometric_center'][:,2][j], self.features['geometric_center'][:,2][i])
         delta_geometric_center = abs(self.features['geometric_center'][j] - self.features['geometric_center'][i])
+        mean_normal = (self.features['normal'][j] + self.features['normal'][i]) / 2
         delta_normal = abs(self.features['normal'][j] - self.features['normal'][i])
         delta_barycenter = abs(self.features['barycenter'][j] - self.features['barycenter'][i])
+        mean_intensity = (self.features['mean_intensity'][j] + self.features['mean_intensity'][i]) / 2
         delta_mean_intensity = abs(self.features['mean_intensity'][j] - self.features['mean_intensity'][i])
         max_var_intensity = np.maximum(self.features['var_intensity'][j], self.features['var_intensity'][i])
+        mean_color = (self.features['mean_color'][j] + self.features['mean_color'][i]) / 2
         delta_mean_color = abs(self.features['mean_color'][j] - self.features['mean_color'][i])
         max_var_color = np.maximum(self.features['var_color'][j], self.features['var_color'][i])
+        max_verticality = np.maximum(self.features['verticality'][j], self.features['verticality'][i])
         delta_verticality = abs(self.features['verticality'][j] - self.features['verticality'][i])
+        max_linearity = np.maximum(self.features['linearity'][j], self.features['linearity'][i])
         delta_linearity = abs(self.features['linearity'][j] - self.features['linearity'][i])
+        max_planarity = np.maximum(self.features['planarity'][j], self.features['planarity'][i])
         delta_planarity = abs(self.features['planarity'][j] - self.features['planarity'][i])
+        max_sphericity = np.maximum(self.features['sphericity'][j], self.features['sphericity'][i])
         delta_sphericity = abs(self.features['sphericity'][j] - self.features['sphericity'][i])
         
-        features = np.hstack((delta_geometric_center,
+        features = np.hstack((max_z[:, None],
+                              delta_geometric_center,
+                              mean_normal,
                               delta_normal,
                               delta_barycenter,
+                              (mean_intensity[:, None] if self.has_laser_intensity() else np.empty((len(j),0))),
                               (delta_mean_intensity[:, None] if self.has_laser_intensity() else np.empty((len(j),0))),
                               (max_var_intensity[:, None] if self.has_laser_intensity() else np.empty((len(j),0))),
+                              (mean_color if self.has_color() else np.empty((len(j),0))),
                               (delta_mean_color if self.has_color() else np.empty((len(j),0))),
                               (max_var_color if self.has_color() else np.empty((len(j),0))),
+                              max_verticality[:, None],
                               delta_verticality[:, None],
+                              max_linearity[:, None],
                               delta_linearity[:, None],
+                              max_planarity[:, None],
                               delta_planarity[:, None],
+                              max_sphericity[:, None],
                               delta_sphericity[:, None]))
-                              
+
         if self.has_label():
             labels = ((self.features['majority_label'][j] == self.features['majority_label'][i]) & (np.minimum(self.features['certainty_label'][j], self.features['certainty_label'][i]) > CERTAINTY_THRESHOLD)).astype(int)
         else:
