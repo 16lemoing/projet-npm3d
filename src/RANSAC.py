@@ -44,14 +44,14 @@ def in_plane(points, normals, ref_pt, ref_normal, threshold_in=0.1, threshold_no
     dists = np.einsum("i,ji->j", ref_normal, points - ref_pt)
     indices = abs(dists) < threshold_in
     if normals is not None:
-        normal_check = np.dot(ref_normal, normals.T) > threshold_normals
+        normal_check = abs(np.dot(ref_normal, normals.T)) > threshold_normals
         return indices & normal_check
     return indices
 
 
 def RANSAC(points, normals=None, NB_RANDOM_DRAWS=100, threshold_in=0.1, threshold_normals=0.8):
     """
-    Applies the RANSAC algorithm to find a plane
+    Applies the RANSAC algorithm to find an horizontal plane
 
     Parameters
     ----------
@@ -85,7 +85,7 @@ def RANSAC(points, normals=None, NB_RANDOM_DRAWS=100, threshold_in=0.1, threshol
         nb = np.sum(in_plane(points, normals, ref_pt, ref_normal, threshold_in))
         
         # Updating the best plane if needed
-        if nb > best_nb:
+        if nb > best_nb and abs(ref_normal[2]) > threshold_normals:
             best_nb = nb
             best_ref_pt = ref_pt
             best_normal = ref_normal
