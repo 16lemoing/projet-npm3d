@@ -5,6 +5,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
+import os
     
 # def plot_voxels(voxelcloud, idxs = None, colors = None, only_voxel_center = False, also_unassociated_points = False):
 #     """
@@ -129,7 +130,7 @@ def plot(cloud, idxs = None, colors = None, only_voxel_center = True, also_unass
     
     plt.show()
 
-def plot_confusion_matrix(cm, classes, data_type=""):
+def plot_confusion_matrix(cm, classes, data_type, id, folder):
     
     tot_gt = np.sum(cm, axis=1)
     n_cm = (cm.T / tot_gt).T
@@ -137,7 +138,7 @@ def plot_confusion_matrix(cm, classes, data_type=""):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     cax = ax.matshow(n_cm)
-    plt.title(f"Confusion matrix of the classifier on {data_type} data (all points)")
+    plt.title(f"Confusion matrix for {data_type}")
     fig.colorbar(cax)
     ax.set_xticklabels([''] + classes)
     ax.set_yticklabels([''] + classes)
@@ -153,4 +154,4 @@ def plot_confusion_matrix(cm, classes, data_type=""):
                 color="white" if n_cm[i,j] < 0.5 else "black",
                 fontsize=6)
     plt.tight_layout()
-    plt.show()
+    plt.savefig(os.path.join(folder, f"{id}_{data_type}.png"))
