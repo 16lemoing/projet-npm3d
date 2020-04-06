@@ -15,6 +15,7 @@ class ComponentCloud:
 
     def __init__(self, voxelcloud, c_D = 0.25, 
                  method = "normal", K = 15, 
+                 weights = [1, 1, 1],
                  segment_out_ground = False,
                  threshold_in = 1, threshold_normals = 0.8,
                  min_component_length = 1):
@@ -34,7 +35,7 @@ class ComponentCloud:
         self.c_D = c_D
         
         if method == "spectral":
-            self.components = self.voxelcloud.find_connected_components_similarity(self.c_D, weights = [1,1,1], K = K)
+            self.components = self.voxelcloud.find_connected_components_similarity(self.c_D, weights = weights, K = K)
             self.too_small_components = []
         else:
             self.components, self.too_small_components = self.voxelcloud.compute_connected_components(self.c_D, segment_out_ground, threshold_in, threshold_normals, min_component_length)
