@@ -313,22 +313,30 @@ class VoxelCloud:
         w_D = (size_target + size_candidates) / 2
         w_I = np.maximum(vi_target, vi_candidates)
         w_C = np.maximum(vc_target, vc_candidates)
+        w_I2 = np.maximum(mi_target, mi_candidates)
+        w_C2 = np.maximum(mc_target, mc_candidates)
         
         sim += weights[0] * np.sum(np.maximum(1 - abs(gc_target - gc_candidates) / (w_D + c_D), np.zeros((len(j), 3))), axis = 1)
         
         if self.has_laser_intensity() is not None:
-            sim += weights[1] * np.maximum(1 - abs(mi_target - mi_candidates) / 3 / (np.sqrt(w_I) + 1e-6), np.zeros(len(j)))
+            sim += weights[1] * np.maximum(1 - abs(mi_target - mi_candidates) / 2 / (w_I + 1e-6), np.zeros(len(j)))
         
         if self.has_color() is not None:
-            sim += weights[2] * np.sum(np.maximum(1 - abs(mc_target - mc_candidates) / 3 / (np.sqrt(w_C) + 1e-6), np.zeros((len(j), 3))), axis = 1)
-
+            sim += weights[2] * np.sum(np.maximum(1 - abs(mc_target - mc_candidates) / 2 / (w_C + 1e-6), np.zeros((len(j), 3))), axis = 1)
+        
+        #raise Exception()
+        #♣sim[abs(np.sum(np.tile(n_target, (len(j), 1)) * n_candidates, axis = 1)) > 0.7] += 3
+        
+        # idpen = (abs(np.sqrt(vi_candidates) / mi_candidates) > 0.2) & np.any(abs(np.sqrt(vc_candidates) / mc_candidates) > 0.2, axis = 1)
+        # sim[idpen] = np.maximum(sim[idpen] - 3, 0)
+        
         return sim[0] if isnum else sim
     
     def build_similarity_graph(self, c_D, weights):
-        # A = np.zeros((len(self), len(self)))
-        # D = np.zeros((len(self), len(self)))
-        A = sparse.lil_matrix((len(self), len(self)))
-        D = sparse.lil_matrix((len(self), len(self)))
+        A = np.zeros((len(self), len(self)))
+        D = np.zeros((len(self), len(self)))
+        #A = sparse.lil_matrix((len(self), len(self)))
+        #D = sparse.lil_matrix((len(self), len(self)))
         
         neighbours = []
         idxs = list(range(len(self)))
@@ -345,8 +353,8 @@ class VoxelCloud:
         A, D = self.build_similarity_graph(c_D, weights)
         L = D - A
         print("Finding the eigendecomposition of the Laplacian graph... This may require time.")
-        eigenvalues, eigenvectors = sparse.linalg.eigsh(L, k=K)
-        # eigenvalues, eigenvectors = np.linalg.eigh(L)
+        #eigenvalues, eigenvectors = sparse.linalg.eigsh(L, k=K, which="SM")
+        eigenvalues, eigenvectors = np.linalg.eigh(L)
         print("Successfully diagonalized Laplacian matrix")
         gm = GaussianMixture(K)
         lbl = gm.fit_predict(eigenvectors[:,:K])
@@ -483,7 +491,7 @@ class VoxelCloud:
             then removed the connected components which have less voxels than the threshold
         """
         
-        cp = self.compute_connected_components(c_D)
+        cp = self.compute_connected_components(c_D, segment_out_ground = False, threshold_in = None, threshold_normals = None, min_component_length = 1)[0]
         lengths = np.zeros(len(cp))
         for i in range(len(cp)):
             lengths[i] = len(cp[i])
