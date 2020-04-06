@@ -1,0 +1,14 @@
+% Test set precision metrics with and without neighbourhood classifier
+\begin{table}[]
+\tiny
+\begin{tabular}{l|c|c|c|c|c|c|c|c|c|c|c|c|}
+\cline{2-13}
+                                              & \multicolumn{4}{c|}{données d'entraînement}                                  & \multicolumn{8}{c|}{données de test}                                                                                                             \\ \cline{2-13} 
+                                              & \multicolumn{2}{c|}{domfountain1} & \multicolumn{2}{c|}{untermaederbrunnen1} & \multicolumn{2}{c|}{domfountain2} & \multicolumn{2}{c|}{domfountain3} & \multicolumn{2}{c|}{neugasse} & \multicolumn{2}{c|}{untermaederbrunnen3} \\ \cline{2-13} 
+                                              & comp.            & point          & comp.               & point              & comp.           & point           & comp.           & point           & comp.         & point         & comp.               & point              \\ \hline
+\multicolumn{1}{|l|}{critère de voisinage}    & \textbf{100}     & 92             & \textbf{100}        & 93                 & 94              & 92              & 95              & 94              & 97            & 91            & 90                  & 85                 \\ \hline
+\multicolumn{1}{|l|}{apprentissage supervisé} & 99               & \textbf{98}    & \textbf{100}        & \textbf{96}        & \textbf{96}     & \textbf{95}     & \textbf{96}     & \textbf{95}     & \textbf{98}   & \textbf{92}   & \textbf{99}         & \textbf{96}        \\ \hline
+\end{tabular}
+\caption{Précision (\%) au niveau des composantes connexes et des points, avec et sans apprentissage de la relation de voisinage. Pour les nuages de l'ensemble d'entraînement on remarque un amélioration de la précision lorsque la vérité terrain est donnée au niveau des points. Ceci témoigne directement du fait que la segmentation est meilleure avec l'apprentissage de la relation de voisinage. De même, pour les nuages de tests on a globalement de meilleurs résultats lorsque la relation de voisinage est apprise.}
+\label{table:neighbourhood}
+\end{table}
