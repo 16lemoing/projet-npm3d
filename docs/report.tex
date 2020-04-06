@@ -117,6 +117,7 @@ Cette étape est effectuée dans la fonction \texttt{postprocess\_small\_voxels}
 \end{figure}
 
 \subsection{Calcul des caractéristiques des voxels}
+\label{partie-caracteristiques-voxels}
 Une fois les points composant chaque voxel déterminés, il est possible de calculer les caractéristiques locales en associant à chaque voxel $\V$:
 
 \begin{itemize}
@@ -166,6 +167,7 @@ La recherche des composantes connexes pourrait se faire de façon naïve en $\ma
 \end{itemize}
 
 \subsection{Segmentation du sol}
+\label{segmentation-sol}
 Les composantes connexes obtenues par la méthode précédente ne sont pas immédiatement satisfaisantes car encore trop peu segmentées, comme on peut le voir sur l'image de gauche de la figure \ref{fig:first_segmentations} où l'on a affiché en couleurs les différentes composantes connexes obtenues avec $c_D = 0.25\text{m}$ et $s_\text{max}=0.3\text{m}$. Le sol a tendance à agir comme un pont entre les objets et la modification des conditions de voisinage (par exemple en jouant sur le paramètre $c_D$) a pour effet soit de sur-segmenter certaines zones soit d'en sous-segmenter d'autres. Dans le cas étudié sur cette image, on voit notamment que l'arbre, la voiture et le sol entre les deux ont été regroupés dans une même composante connexe. 
 
 L'article propose cependant une méthode permettant de régler ce problème : il inclut une information \emph{a priori} sur le nuage de points : celle que la scène étudiée comporte un sol relativement plat et étendu. Parvenir à éliminer le sol permet alors de segmenter correctement les objets restants avant de les classifier.
@@ -179,7 +181,7 @@ La méthode employée par les auteurs pour segmenter le sol repose sur un seuill
 \end{figure}
 
 \subsection{Méthodes alternatives de recherche des composantes connexes}
-La méthode proposée par les auteurs et que nous avons présentée jusqu'ici se place dans un contexte extérieur, suppose que le sol est relativement plat et que les objets peuvent être séparés aisément dès que le sol est retiré du nuage de voxels. Nous nous sommes cependant posé la question de l'efficacité de la méthode dans d'autres contextes : il est probable que la présence de nombreux objets entremêlés ou un sol irrégulier peuvent considérablement détériorer les performances de la segmentation, qui est pourtant une étape cruciale avant de pouvoir effectuer la classification. Nous avons donc réfléchi (sans aboutir encore à une solution définitive) à deux méthodes alternatives : l'une non supervisée basée sur le partitionnement spectral du graphe d'adjacence et l'autre supervisée basée sur l'apprentissage de la relation de voisinage entre voxels.
+La méthode proposée par les auteurs et que nous avons présentée jusqu'ici se place dans un contexte extérieur, suppose que le sol est relativement plat et que les objets peuvent être séparés aisément dès que le sol est retiré du nuage de voxels. Nous nous sommes cependant posé la question de l'efficacité de la méthode dans d'autres contextes : il est probable que la présence de nombreux objets entremêlés ou un sol irrégulier puissent considérablement détériorer les performances de la segmentation, qui est pourtant une étape cruciale avant de pouvoir effectuer la classification (une segmentation mal faite mènera forcément à de mauvais résultats car on essaiera de classifier des objets entremêlés ou alors des morceaux d'objets). Nous avons donc réfléchi (sans aboutir encore à une solution définitive) à deux méthodes alternatives : l'une non supervisée basée sur le partitionnement spectral du graphe d'adjacence et l'autre supervisée basée sur l'apprentissage de la relation de voisinage entre voxels.
 
 \subsubsection{Partitionnement spectral}
 Les auteurs de \cite{aka_article} mentionnent dans leur revue de littérature la possibilité d'effectuer un partitionnement de graphe, en citant notamment l'article \cite{mincut}. Nous avons repris l'idée en étendant la matrice d'adjacence définie par la condition de voisinage du paragraphe \ref{condvoisinage} pour avoir des entrées moins brutales qu'une simple matrice binaire indiquant si les points sont voisins ou non. On construit à la place une matrice de similarité indiquant le degré de proximité des voxels du nuage (fonction \texttt{similarity(i,j)} de la classe \texttt{VoxelCloud}).
@@ -212,31 +214,49 @@ On peut voir à la figure \ref{fig:network_kernel} le graphe d'adjacence pondér
 Les résultats très encourageants de cette méthode pour ce cas particulier sont à nuancer par plusieurs inconvénients. Elle est beaucoup aidée par la connaissance \emph{a priori} du nombre d'objets à segmenter, elle est très coûteuse en calculs (avec notamment une diagonalisation d'une matrice ayant la même taille que le nombre de voxels) et elle nécessite de trouver une fonction de similarité suffisamment satisfaisante pour le problème considéré. Des solutions sont envisageables pour chacun de ces problèmes, mais leur étude nécessitera du temps. On pourra se référer pour une étude plus approfondie du partitionnement spectral à \cite{spectralclustering}.
 
 \subsubsection{Apprentissage supervisé}
-Une autre méthode alternative que nous avons essayée est d'apprendre de manière supervisée la relation de voisinage entre voxels. L'objectif était d'avoir une condition d'association de voxels voisins plus robuste que celle proposée dans \cite{aka_article} en reposant sur un plus grand nombre de paramètres et en adaptant les critères de décision à la nature du nuage de point (il n'exite pas a priori une méthode de segmentation qui fonctionnerait pour tout type de nuage de points). La méthode proposée cherche, à partir d'un vecteur de paramètres qui qualifient une paire de voxels (delta des couleurs, de la réflectance laser, du centre géométrique ou encore de la planarité, verticalité, sphéricité, linéarité...), à déterminer si deux voxels sont voisins. Dans cette étude nous considérons que deux voxels sont voisins si d'une part ils sont assez proches et d'autre part s'ils partagent le même label avec un seuil de pureté acceptable (i.e.\ le label dominant doit être partagé par au moins un certain pourcentage des pixels à l'intérieur du voxel). Il faut alors entrainer un classifieur binaire. Considérer l'ensemble des paires de voxels possibles n'est pas très judicieux car la notion de voisinage n'a un sens que si les voxels sont proches. Pour restreindre le nombre de paires, nous avons donc choisi de préfiltrer les paires en appliquant la condition sur les distances mentionnée dans  \cite{aka_article}. De plus, comme notre méthode de ségmentation s'appuie sur le filtrage du sol, il n'y a pas d'intérêt à apprendre ce qu'est la relation de voisinage pour les voxels du sol (d'autant plus que ceux-ci sont en grand nombre et pourraient polluer l'apprentissage). Nous faisons donc le choix de filtrer les voxels du sol avant de sélectionner les paires. Les composantes connexes étant assez denses, des voxels proches sont souvent voisins (dans le sens défini ci-dessus), il y avait donc un grand déséquilibre dans les données d'entrainement entre les deux classes (voisin / pas voisin). Ceci peut être néfaste pour l'entrainement. Nous avons donc procédé à un rééquilibrage des classes (voisin / non voisin) en amont de l'apprentissage. Nous avons choisi come classifieur un \emph{Random Forest} (forêt d'arbres décisionnels) composée de $20$ arbres de décision. Une fois le classifieur de voisinage appris, nous pouvons appliquer cette relation de voisinage à de nouveaux nuages de points et ainsi déterminer les composantes connexes de ces nuages.
+Une méthode alternative que nous avons essayée est d'apprendre de manière supervisée la relation de voisinage entre voxels. L'objectif était d'avoir une condition d'association de voxels voisins plus robuste que celle proposée dans \cite{aka_article} en reposant sur un plus grand nombre de paramètres et en adaptant les critères de décision à la nature du nuage de points (il n'existe pas a priori une méthode de segmentation qui fonctionnerait pour tout type de nuage de points). La méthode proposée cherche, à partir d'un vecteur de paramètres qui qualifient une paire de voxels (delta des couleurs, de la réflectance laser, du centre géométrique ou encore de la planarité, verticalité, sphéricité, linéarité...), à déterminer si deux voxels sont voisins. 
+
+Dans cette étude, pour la phase d'apprentissage, nous considérons que deux voxels sont réellement voisins si d'une part ils sont assez proches et d'autre part s'ils partagent le même label avec un seuil de pureté acceptable (i.e.\ le label dominant doit être partagé par au moins un certain pourcentage des pixels à l'intérieur du voxel). Il faut alors entrainer un classifieur binaire. 
+
+Notons maintenant que considérer l'ensemble des paires de voxels possibles n'est pas très judicieux car la notion de voisinage n'a un sens que si les voxels sont proches. Pour restreindre le nombre de paires, nous avons donc choisi de préfiltrer les paires en appliquant la condition sur les distances mentionnée dans  \cite{aka_article}. De plus, comme notre méthode de segmentation s'appuie sur le filtrage du sol, il n'y a pas d'intérêt à apprendre ce qu'est la relation de voisinage pour les voxels du sol (d'autant plus que ceux-ci sont en grand nombre et pourraient polluer l'apprentissage). Nous faisons donc le choix de filtrer les voxels du sol avant de sélectionner les paires. 
+
+Une dernière difficulté : les composantes connexes étant assez denses, des voxels proches sont souvent voisins (dans le sens défini ci-dessus).  Il y a donc a priori un grand déséquilibre dans les données d'entrainement entre les deux classes (voisin / non-voisin). Ceci peut être néfaste pour l'entraînement, nous avons donc procédé à un rééquilibrage des classes (voisin / non-voisin) en amont de l'apprentissage. 
+
+Nous avons enfin choisi comme classifieur un \emph{Random Forest} (forêt d'arbres décisionnels) composée de $20$ arbres de décision. Une fois le classifieur de voisinage appris, nous pouvons appliquer cette relation de voisinage à de nouveaux nuages de points et ainsi déterminer les composantes connexes de ces nuages.
+
+Cette méthode a donné des résultats plutôt satisfaisants sur de grands nuages de points, c'est donc celle que nous avons retenue pour traiter convenablement les données du jeu de données Semantic3D mentionné plus bas.
+
+\TODO Guillaume, y a-t-il moyen d'appliquer ta segmentation par apprentissage au jeu de données utilisé dans la figure 6 pour montrer ce que cela donne ?
 
 \section{Classification des objets segmentés}
-La dernière étape de la méthode est enfin la classification des composantes connexes du nuage de points. 
+La dernière étape de la méthode est enfin la classification des composantes connexes du nuage de points. Nous présentons dans ce qui suit la méthode proposée par l'article, notre implémentation ainsi que la métrique utilisée.
 
 \subsection{Méthode}
-La méthode de classification introduite par \cite{aka_article} étant peu détaillée et reposant sur des seuils arbitrairement choisis, nous avons décidé d'appuyer notre méthode sur les mêmes paramètres (que nos avons d'ailleurs enrichis) et d'apprendre de manière supervisée la classification des composantes connexes. Pour reprendre les catégories de paramètres spécifiées dans \cite{aka_article}, nous avons considéré les paramètres liés :
+La méthode de classification introduite repose sur l'agrégation des caractéristiques des voxels des composantes connexes. Supposons que l'on veuille classifier un objet qui a été segmenté en une composante connexe : cet objet est constitué de plusieurs voxels, chacun ayant certaines caractéristiques qui ont été calculées à la partie \ref{partie-caracteristiques-voxels}. L'idée est alors simplement de regarder \og de loin \fg\ à quoi ressemble cet objet en observant une ou plusieurs fonctions de ces caractéristiques, des \emph{features}. Par exemple, on peut calculer la moyenne des couleurs des voxels composant l'objet et déterminer s'il s'agit plutôt d'herbe ou d'asphalte. Ou encore observer le barycentre de l'objet et le comparer à son centre géométrique.
+
+Cependant, la méthode exacte de \cite{aka_article} est peu détaillée et repose sur de simples seuils arbitrairement choisis sur certaines fonctions des caractéristiques des voxels. Nous avons donc décidé d'appuyer notre méthode sur les mêmes paramètres (que nos avons d'ailleurs enrichis) et d'apprendre de manière supervisée la classification des composantes connexes. Pour reprendre les catégories de paramètres spécifiées dans \cite{aka_article}, nous avons considéré les paramètres liés :
 \begin{itemize}
 \item \textbf{Aux normales} : la moyenne et la variance de la projection des normales des voxels de la composante connexe sur l'axe z ainsi que sur le plan défini par les axes x et y.
 \item \textbf{Au centre géométrique et au barycentre} : le centre géométrique de la composante connexe calculé à partir de l'ensemble des voxels de celle-ci, même chose pour le barycentre.
-\item \textbf{A la couleur et l'intensité} : la moyenne et la variance des couleurs et de la refléctance laser des voxels de la composante connexe.
+\item \textbf{A la couleur et l'intensité} : la moyenne et la variance des couleurs et de la réflectance laser des voxels de la composante connexe.
 \item \textbf{A la forme géométrique} : les valeurs propres et vecteurs de la \emph{Principal Component Analysis} (PCA) des centres géométriques des voxels de la composante connexe, la moyenne de la verticalité, linéarité, planarité et sphéricité  des voxels de la composante connexe, le nombre de voxels dans la composante connexe et la taille de la composante connexe.
 \end{itemize}
-La taille des données s'y prêtant bien, nous avons choisi comme classifieur un \emph{Random Forest} (forêt d'arbres décisionnels) composée de $20$ arbres de décision.
+La taille des données s'y prêtant bien, nous avons choisi comme classifieur un \emph{Random Forest} (forêt d'arbres décisionnels) composée de $20$ arbres de décision. Il suffit alors d'utiliser les étiquettes \emph{labels} fournis dans le jeu de données et d'apprendre à classifier les objets en fonction de leurs \emph{features}.
 
 \subsection{Métrique}
 
-Afin dévaluer la pertinence de notre méthode nous proposons plusieurs métriques.
+Afin dévaluer la pertinence de la classification nous proposons plusieurs métriques.
 
 Tout d'abord des calculs de précision :
 \begin{itemize}
 \item \textbf{Au niveau des composantes connexes} On attribue à l'ensemble des points de chaque composante connexe un unique label par vote de majorité sur les voxels qui la constituent. En effet, la segmentation n'étant pas toujours parfaite il se peut que des voxels de différents labels se retrouvent segmentés dans un même objet. On compare ensuite ce label de vérité terrain (obtenu par vote) au label prédit par le classifieur en chacun des points. Cette métrique permet de comparer la classification prédite à la meilleure classification possible en vue de la segmentation obtenue. Ainsi on peut évaluer la classification en se soustrayant des problèmes introduits par une mauvaise segmentation.
-\item \textbf{Au niveau des points} On peut également calculer la précision au niveau des points. Par ceci, on entend que la vérité terrain est donnée en chacun des points (et non plus pour chaque composante). Dans notre méthode, certains points ont été mis de côté parce qu'ils appartenaient à un voxel trop petit ou un voxel qui lui-même appartenait à un objet trop petit. Afin d'être plus juste, lors de la prédiction on attribue à ces points le labels prédits du voxel le plus proche parmi les voxels qui appartiennent à des composantes connexes. Cette métrique rend compte de la qualité de la classification tout comme de la qualité de la segmentation.
+
+\item \textbf{Au niveau des points} On peut également calculer la précision au niveau des points. Par ceci, on entend que la vérité terrain est donnée en chacun des points (et non plus pour chaque composante). Dans notre méthode, certains points ont été mis de côté parce qu'ils appartenaient à un voxel trop petit ou un voxel qui lui-même appartenait à un objet trop petit. Afin d'être plus juste, lors de la prédiction on attribue à ces points le label prédit du voxel le plus proche parmi les voxels qui appartiennent à des composantes connexes. Cette métrique rend compte de la qualité de la classification tout comme de la qualité de la segmentation.
 \end{itemize}
-De plus pour mesurer la performance au niveau des différentes classes, on donne aussi la matrice de confusion comme il a été fait dans \cite{aka_article}.
+
+Notons que l'article \cite{aka_article} propose une troisième voie, différente en évaluant l'erreur de classification au niveau des voxels. Ayant déjà deux métriques très complémentaires, nous n'avons pas jugé utile d'en utiliser une troisième dont les résultats devraient, en toute logique, se situer entre les résultats des deux métriques que nous venons de mentionner.
+
+Quelle que soit la méthode choisie, on dispose d'une vérité terrain et d'une classification et on calcule alors la matrice de confusion qui donne le nombre (et on déduit aisément la proportion) de points bien et mal classifiés dans chaque classe.
 
 \section{Données, résultats et conclusion}
 \subsection{Implémentation}
@@ -251,15 +271,17 @@ Cette implémentation reprend quelques éléments du code de Hugues Thomas\footn
 \subsection{Données}
 \label{partie-donnees}
 Les données mentionnées en 2013 dans l'article \cite{aka_article} n'étant plus disponibles en ligne en 2020, nous avons travaillé sur le jeu de données \texttt{semantic-8} de \href{http://www.semantic3d.net/}{\emph{Semantic3D}} \cite{hackel2017isprs}. Celles-ci ont l'avantage de comporter non seulement les données d'intensité de réflectance laser mais aussi de couleur RGB de chaque point, en plus d'être partiellement classifiées. Ce dernier point nous a permis de mettre en place une méthode de classification par apprentissage.
-Nous avons d'abord réalisé nos expérimentations sur une version réduite du nuage \texttt{bildstein5} avant d'appliquer notre méthode à de plus gros nuages. Finalement nous avons sélectionné \texttt{domfountain1} et \texttt{untermaederbrunnen1} comme nuages d'entraînement, ainsi que \texttt{domfountain2}, \texttt{domfountain3}, \texttt{neugasse} et \texttt{untermaederbrunnen3} pour le test. Deux autres nuages \texttt{bildstein3} et \texttt{bildstein5}, plus difficiles, car comportant une colline ont aussi été utilisés pour tester davantage notre méthode. Les classes des différents objets fournis avec les nuages de points sont les suivants : \texttt{terrain artificiel}, \texttt{terrain naturel}, \texttt{végétation haute}, \texttt{végétation basse}, \texttt{bâtiment}, \texttt{aménagement urbain}, \texttt{artefact de numérisation} et \texttt{voiture}. Nous n'avons gardé que les points annotés de ces nuages et avons fusionné les classes \texttt{terrain artificiel} et \texttt{terrain naturel} en \texttt{terrain}.
+Nous avons d'abord réalisé nos expérimentations sur une version réduite du nuage \texttt{bildstein5} avant d'appliquer notre méthode à de plus gros nuages. Finalement nous avons sélectionné \texttt{domfountain1} et \texttt{untermaederbrunnen1} comme nuages d'entraînement, ainsi que \texttt{domfountain2}, \texttt{domfountain3}, \texttt{neugasse} et \texttt{untermaederbrunnen3} pour le test. Deux autres nuages \texttt{bildstein3} et \texttt{bildstein5}, plus difficiles, car comportant une colline ont aussi été utilisés pour tester davantage notre méthode. Les classes des différents objets fournis avec les nuages de points sont les suivantes : \texttt{terrain artificiel}, \texttt{terrain naturel}, \texttt{végétation haute}, \texttt{végétation basse}, \texttt{bâtiment}, \texttt{aménagement urbain}, \texttt{artefact de numérisation} et \texttt{voiture}. Nous n'avons gardé que les points annotés de ces nuages et avons fusionné les classes \texttt{terrain artificiel} et \texttt{terrain naturel} en \texttt{terrain} pour n'avoir qu'un seul type de sol, comme dans l'article que nous avons étudié.
 
 \subsection{Résultats}
 
+\TODO Il faudrait introduire et dire que dans ce qui suit, on présente les résultats comparés de sous-méthodes et de variantes, et ensuite qu'en annexe on parle des résultats globaux pour une seule méthode. Il faudrait comparer ces résultats à ceux de l'article ? Même en un paragraphe ?
+
 \subsubsection{Segmentation du sol}
 
-Comme nous l'avons vu précédemment, nous avons mis en place une méthode afin de segmenter le sol dans un premier temps. Ceci permettant de faciliter la segmentation des autres objets, qui se retrouvent alors déconnectés des uns des autres pour la plupart. Nous comparons dans la Table \ref{table:ground} les résultats en terme de précision, toutes classes confondues, avec et sans cette méthode de segmentation du sol. On compare également les erreurs de classification classe par classe pour tous les nuages de l'ensemble de test dans la Figure \ref{fig:ground}.
+Comme nous l'avons vu précédemment dans la partie \ref{segmentation-sol}, nous avons mis en place une méthode afin de segmenter le sol dans un premier temps. Ceci permet de faciliter la segmentation des autres objets, qui se retrouvent alors déconnectés des uns des autres pour la plupart. Nous comparons dans la Table \ref{table:ground} les résultats en terme de précision, toutes classes confondues, avec et sans cette méthode de segmentation du sol. On compare également les erreurs de classification classe par classe pour tous les nuages de l'ensemble de test dans la Figure \ref{fig:ground}.
 
-\begin{figure}
+\begin{figure}[p]
     \centering
     \subfloat[sans segmentation du sol]{{\includegraphics[width=8cm]{fig/test_without_ground_segmentation.png} }}
     \qquad
@@ -276,7 +298,7 @@ Comme nous l'avons vu précédemment, nous avons mis en place une méthode afin 
 
 Une autre amélioration que nous avons proposée est l'apprentissage supervisé de la relation de voisinage pour l'identification des composantes connexes (objets). Nous comparons les résultats obtenus avec le critère de voisinage de \cite{aka_article} appliqué tel quel et avec l'apprentissage de la relation de voisinage. Pour une comparaison juste, dans les deux cas on réalise au préalable la segmentation du sol à part. La précision pour les deux méthodes et pour les différents nuages est donnée dans la Table \ref{table:neighbourhood} et les résultats classe par classe sont donnés dans la Figure \ref{fig:neighbourhood}.
 
-\begin{figure}
+\begin{figure}[p]
     \centering
     \subfloat[critère de voisinage de \cite{aka_article}]{{\includegraphics[width=8cm]{fig/test_with_ground_segmentation.png} }}
     \qquad
@@ -289,9 +311,13 @@ Une autre amélioration que nous avons proposée est l'apprentissage supervisé 
 
 \subsubsection{Influence de la réflectance laser et de la couleur}
 
-Il nous a paru important d'évaluer l'influence de l'information de couleur et de réflectance laser sur la performance. Nous avons donc comparé notre méthode avec segmentation du sol en amont et apprentissage de la relation de voisinage pour des nuages avec et sans les informations de couleurs et de réflectance laser. Les résultats sont donnés dans la Table \ref{table:laser_color} et la Figure \ref{fig:laser_color}. 
+Les informations de couleur et de réflectance laser n'étant pas toujours présentes dans les nuages de points disponibles sur internet, il nous a paru important d'évaluer l'influence de l'information de couleur et de réflectance laser sur la performance afin de pouvoir étudier la capacité du modèle à s'exporter sur un grand nombre de données. Nous avons donc comparé notre méthode avec segmentation du sol en amont et apprentissage de la relation de voisinage pour des nuages avec et sans les informations de couleurs et de réflectance laser. Les résultats sont donnés dans la Table \ref{table:laser_color} et la Figure \ref{fig:laser_color}.
 
-\begin{figure}
+Il est étonnant de noter que là où des expérimentation similaires dans \cite{aka_article} menaient à une dégradation très sensible des résultats en l'absence d'information de couleur, nos résultats sont, pour leur part, stables. Ceci est probablement dû à l'utilisation de notre méthode d'apprentissage de la relation de voisinage qui, semble-t-il, repose plus sur l'information géométrique que sur l'information colorimétrique.
+
+\TODO Je trouve ça fou quand même, ... Comparé aux résultats de l'article c'est dingue
+
+\begin{figure}[p]
     \centering
     \subfloat[avec couleur et réflectance laser]{{\includegraphics[width=8cm]{fig/test_neighbourhood_classifier.png} }}
     \qquad
@@ -304,7 +330,7 @@ Il nous a paru important d'évaluer l'influence de l'information de couleur et d
 
 \subsection{Conclusion}
 
-Lors de ce projet nous avons tenté de reproduire la méthode introduite dans \cite{aka_article}. Nous nous sommes attachés à l'améliorer sur un point qui nous a semblé un peu fragile dans la méthode d'origine : le choix de seuils souvent arbitraires pour segmenter le nuage et classifier les différents objets. Nous nous sommes aperçu, par exemple, que l'application de la méthode telle quelle sur une nouvelle base de données ne donnait pas des résultats optimaux. Nous avons détaillé une méthode robuste pour segmenter le sol. Puis nous avons proposé deux méthodes alternatives pour la segmentation : une méthode de partitionnement spectral et l'apprentissage supervisé de la relation de voisinage. La méthode par l'apprentissage supervisé a permis d'améliorer les résultats de segmentation et donc, dans le même temps, de classification. Nous avons également proposé d'utiliser l'apprentissage supervisé pour l'étape de classification. Les résultats ne sont pas encore parfait mais sont plutôt encourageant. Ils pourraient être largement améliorés avec un entraînement sur une plus grande base de données. Ceci serait même possible dans notre \emph{framework}, puisqu'il permet l'apprentissage simultané sur plusieurs nuages de points.
+Lors de ce projet nous avons tenté de reproduire la méthode introduite dans \cite{aka_article}. Nous nous sommes attachés à l'améliorer sur un point qui nous a semblé un peu fragile dans la méthode d'origine : le choix de seuils souvent arbitraires pour segmenter le nuage et classifier les différents objets. Nous nous sommes aperçu, par exemple, que l'application de la méthode telle quelle sur une nouvelle base de données ne donnait pas des résultats optimaux. Nous avons détaillé une méthode robuste pour segmenter le sol. Puis nous avons proposé deux méthodes alternatives pour la segmentation : une méthode de partitionnement spectral et l'apprentissage supervisé de la relation de voisinage. La méthode par l'apprentissage supervisé a permis d'améliorer les résultats de segmentation et donc, dans le même temps, de classification. Nous avons également proposé d'utiliser l'apprentissage supervisé pour l'étape de classification. Les résultats ne sont pas encore parfaits mais sont plutôt encourageant. Ils pourraient être largement améliorés avec un entraînement sur une plus grande base de données. Ceci serait même possible dans notre \emph{framework}, puisqu'il permet l'apprentissage simultané sur plusieurs nuages de points.
 
 \newpage
 
