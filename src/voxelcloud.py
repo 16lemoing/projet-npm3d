@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 
+import random
+import time
 import numpy as np
 from tqdm import tqdm
+from scipy import sparse
 from sklearn.neighbors import KDTree
-from descriptors import local_PCA, features_from_PCA
-from RANSAC import RANSAC, in_plane
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
-import time
-from scipy import sparse
 from sklearn.cluster import SpectralClustering
+
+from descriptors import local_PCA, features_from_PCA
+from RANSAC import RANSAC, in_plane
 
 class VoxelCloud:
     def __init__(self, pointcloud, max_voxel_size = 0.3, min_voxel_length = 4, threshold_grow = 1.5, method = "regular", seed = 42):
@@ -36,6 +38,7 @@ class VoxelCloud:
         self.voxels = []
         self.too_small_voxels = []
         self.removed_voxels = []
+        self.neighbourhood_classifier = None
         
         if method == "regular":
             self.compute_voxels_regular_grid(max_voxel_size, min_voxel_length)
@@ -277,6 +280,28 @@ class VoxelCloud:
             return cond[0]
         
         return cond
+        
+    def are_neighbours_clf(self, i, j, c_D):
+        """
+            Generates a mask that tells whether one s-voxels and a group of s-voxels are neighbours or not (using the specified classifier)
+            i : index
+            j : index or list of indices
+        """
+        
+        assert self.neighbourhood_classifier is not None, 'no neighborhood classifier has been defined'
+        
+        isnum = False
+        if type(j) is int:
+            isnum = True
+            j = [j]
+            
+        neighbours_features, _ = self.compute_neighbourhood_feature_and_label(i, j)
+        predicted_neighbours_labels = self.neighbourhood_classifier.predict(neighbours_features).astype(bool)
+            
+        if isnum:
+            return predicted_neighbours_labels[0]
+        
+        return predicted_neighbours_labels
     
     def similarity(self, i, j, c_D, weights = [1/3, 1/3, 1/3]):
         """
@@ -383,7 +408,145 @@ class VoxelCloud:
             components.append(np.where(lbl == i)[0])
         
         return components
-    
+        
+    def compute_neighbourhood_feature_and_label(self, i, j):
+        """
+            For each potential pair of voxel neighbours compute features describing the pair and label (whether it's a true pair or not)
+            i : index
+            j : index or list of indices
+            
+        """
+        
+        CERTAINTY_THRESHOLD = 0.8
+        
+        isnum = False
+        if type(j) is int:
+            isnum = True
+            j = [j]
+        
+        max_z = np.maximum(self.features['geometric_center'][:,2][j], self.features['geometric_center'][:,2][i])
+        delta_geometric_center = abs(self.features['geometric_center'][j] - self.features['geometric_center'][i])
+        mean_normal = (self.features['normal'][j] + self.features['normal'][i]) / 2
+        delta_normal = abs(self.features['normal'][j] - self.features['normal'][i])
+        delta_barycenter = abs(self.features['barycenter'][j] - self.features['barycenter'][i])
+        mean_intensity = (self.features['mean_intensity'][j] + self.features['mean_intensity'][i]) / 2
+        delta_mean_intensity = abs(self.features['mean_intensity'][j] - self.features['mean_intensity'][i])
+        max_var_intensity = np.maximum(self.features['var_intensity'][j], self.features['var_intensity'][i])
+        mean_color = (self.features['mean_color'][j] + self.features['mean_color'][i]) / 2
+        delta_mean_color = abs(self.features['mean_color'][j] - self.features['mean_color'][i])
+        max_var_color = np.maximum(self.features['var_color'][j], self.features['var_color'][i])
+        max_verticality = np.maximum(self.features['verticality'][j], self.features['verticality'][i])
+        delta_verticality = abs(self.features['verticality'][j] - self.features['verticality'][i])
+        max_linearity = np.maximum(self.features['linearity'][j], self.features['linearity'][i])
+        delta_linearity = abs(self.features['linearity'][j] - self.features['linearity'][i])
+        max_planarity = np.maximum(self.features['planarity'][j], self.features['planarity'][i])
+        delta_planarity = abs(self.features['planarity'][j] - self.features['planarity'][i])
+        max_sphericity = np.maximum(self.features['sphericity'][j], self.features['sphericity'][i])
+        delta_sphericity = abs(self.features['sphericity'][j] - self.features['sphericity'][i])
+        
+        features = np.hstack((max_z[:, None],
+                              delta_geometric_center,
+                              mean_normal,
+                              delta_normal,
+                              delta_barycenter,
+                              (mean_intensity[:, None] if self.has_laser_intensity() else np.empty((len(j),0))),
+                              (delta_mean_intensity[:, None] if self.has_laser_intensity() else np.empty((len(j),0))),
+                              (max_var_intensity[:, None] if self.has_laser_intensity() else np.empty((len(j),0))),
+                              (mean_color if self.has_color() else np.empty((len(j),0))),
+                              (delta_mean_color if self.has_color() else np.empty((len(j),0))),
+                              (max_var_color if self.has_color() else np.empty((len(j),0))),
+                              max_verticality[:, None],
+                              delta_verticality[:, None],
+                              max_linearity[:, None],
+                              delta_linearity[:, None],
+                              max_planarity[:, None],
+                              delta_planarity[:, None],
+                              max_sphericity[:, None],
+                              delta_sphericity[:, None]))
+
+        if self.has_label():
+            labels = ((self.features['majority_label'][j] == self.features['majority_label'][i]) & (np.minimum(self.features['certainty_label'][j], self.features['certainty_label'][i]) > CERTAINTY_THRESHOLD)).astype(int)
+        else:
+            labels = np.nan * np.ones(len(j))
+        
+        return features, labels
+        
+    def get_cond_D_mask(self, i, j, c_D):
+        """
+            Generates a mask that tells whether one s-voxels and a group of s-voxels satisfy condition on distances
+            i : index
+            j : index or list of indices
+        """
+
+        isnum = False
+        if type(j) is int:
+            isnum = True
+            j = [j]
+        
+        gc_target = self.features['geometric_center'][i, :]
+        gc_candidates = self.features['geometric_center'][j, :]
+        size_target = self.features['size'][i, :]
+        size_candidates = self.features['size'][j, :]
+        
+        w_D = (size_target + size_candidates) / 2
+        cond_D = np.all(abs(gc_target - gc_candidates) <= w_D + c_D, axis=1)
+        
+        if isnum:
+            return cond_D[0]
+        
+        return cond_D
+        
+    def get_train_neighbourhood_feature_and_label(self, c_D, segment_out_ground, threshold_in, threshold_normals):
+        """
+            Returns feature and label for neighbourhood classifier
+        """
+        
+        assert self.has_label(), 'to train a neighborhood classifier you need to provide ground thruth labels'
+        
+        neighbours_features = []
+        neighbours_labels = []
+        indices = np.array(range(len(self)))
+        
+        # Segment out the ground
+        if segment_out_ground:
+            NB_RANDOM_DRAWS = 1000
+            best_ref_pt, best_normal = RANSAC(self.features['geometric_center'], self.features['normal'], NB_RANDOM_DRAWS, threshold_in, threshold_normals)
+            ground_mask = in_plane(self.features['geometric_center'], self.features['normal'], best_ref_pt, best_normal, threshold_in, threshold_normals)
+            indices = indices[~ground_mask]
+        
+        # Compute features and labels
+        potential = self.find_spatial_neighbours(indices, c_D)
+        for idx in range(len(indices)):
+            unique_mask = (potential[idx] > indices[idx])
+            cond_D_mask = self.get_cond_D_mask(indices[idx], potential[idx], c_D)
+            mask = (unique_mask & cond_D_mask)
+            idx_features, idx_labels = self.compute_neighbourhood_feature_and_label(indices[idx], potential[idx][mask])
+            if len(idx_features) > 0:
+                neighbours_features.append(idx_features)
+                neighbours_labels.append(idx_labels)
+        
+        # Balance positive and negative samples
+        neighbours_features = np.vstack(neighbours_features)
+        neighbours_labels = np.hstack(neighbours_labels)
+        pos_mask = (neighbours_labels == 1)
+        pos_idxes = np.array(range(len(neighbours_features)))[pos_mask]
+        neg_idxes = np.array(range(len(neighbours_features)))[~pos_mask]
+        if len(pos_idxes) > len(neg_idxes):
+            pos_idxes = list(pos_idxes)
+            random.shuffle(pos_idxes)
+            neg_idxes = list(neg_idxes)
+            pos_idxes = pos_idxes[:len(neg_idxes)]
+            all_idxes = pos_idxes + neg_idxes
+            random.shuffle(all_idxes)
+            all_idxes = np.array(all_idxes)
+            neighbours_features = neighbours_features[all_idxes]
+            neighbours_labels = neighbours_labels[all_idxes]
+        
+        return neighbours_features, neighbours_labels
+
+    def set_neighbourhood_classifier(self, neighbourhood_classifier):
+        self.neighbourhood_classifier = neighbourhood_classifier
+
     def find_spatial_neighbours(self, idxs, c_D, exclude_self = True):
         """
             Returns a list of indices of potential neighbouring voxels
@@ -412,13 +575,25 @@ class VoxelCloud:
         
         neighbours = []
         potential = self.find_spatial_neighbours(idxs, c_D)
+        
+        # If a neighbourhood classifier has been specified use it to find neighbours
+        if self.neighbourhood_classifier is not None:
+            # Filter potential neighbours based on condition on distances
+            for i in range(len(idxs)):
+                cond_D_mask = self.get_cond_D_mask(idxs[i], potential[i], c_D)
+                potential[i] = potential[i][cond_D_mask]
+            are_neighbours = self.are_neighbours_clf
+            
+        else:
+            are_neighbours = self.are_neighbours
+
         for i in range(len(idxs)):
-            neighbours.append(potential[i][self.are_neighbours(idxs[i], potential[i], c_D)])
+            neighbours.append(potential[i][are_neighbours(idxs[i], potential[i], c_D)])
             
         if isnum:
             return neighbours[0]
             
-        return neighbours    
+        return neighbours
     
     def compute_connected_components(self, c_D, segment_out_ground, threshold_in, threshold_normals, min_component_length):
         """
