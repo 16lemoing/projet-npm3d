@@ -277,6 +277,10 @@ Nous avons d'abord réalisé nos expérimentations sur une version réduite du n
 
 \TODO Il faudrait introduire et dire que dans ce qui suit, on présente les résultats comparés de sous-méthodes et de variantes, et ensuite qu'en annexe on parle des résultats globaux pour une seule méthode. Il faudrait comparer ces résultats à ceux de l'article ? Même en un paragraphe ?
 
+Les résultats globaux de la méthode sont visibles dans l'annexe, nuage par nuage. Nous avons choisi de comparer nos résultats à ceux de l'article \cite{aka_article} en utilisant les matrices de confusion qui permettent un examen plus précis de la répartition entre les différentes classes. \TODO Du coup se comparer aux chiffres de l'article sur un exemple ?
+
+Nous présentons dans le reste de cette partie les résultats de certains points particuliers de notre implémentation.
+
 \subsubsection{Segmentation du sol}
 
 Comme nous l'avons vu précédemment dans la partie \ref{segmentation-sol}, nous avons mis en place une méthode afin de segmenter le sol dans un premier temps. Ceci permet de faciliter la segmentation des autres objets, qui se retrouvent alors déconnectés des uns des autres pour la plupart. Nous comparons dans la Table \ref{table:ground} les résultats en terme de précision, toutes classes confondues, avec et sans cette méthode de segmentation du sol. On compare également les erreurs de classification classe par classe pour tous les nuages de l'ensemble de test dans la Figure \ref{fig:ground}.
@@ -347,7 +351,7 @@ Lors de ce projet nous avons tenté de reproduire la méthode introduite dans \c
 \fbox{\includegraphics[width=0.2\textwidth]{fig/legend.jpg}}
 \end{wrapfigure}
 
-On donne pour chacun des nuages de l'ensemble d'entraînement, de test ou de test supplémentaire (a) la matrice de confusion pour la classification, (b) la segmentation où chaque composante connexe s'est vue attribuer une couleur aléatoire, (c) la prédiction de classification (pour alléger l'affichage, seul les centres géométriques de chacun des voxels ne sont représentés), (d) la vérité terrain. La légende pour interpréter les couleurs de la classification sont données ci-contre.
+On donne pour chacun des nuages de l'ensemble d'entraînement, de test ou de test supplémentaire (a) la matrice de confusion pour la classification, (b) la segmentation où chaque composante connexe s'est vu attribuer une couleur aléatoire, (c) la prédiction de classification (pour alléger l'affichage, seuls les centres géométriques de chacun des voxels sont représentés), (d) la vérité terrain. La légende pour interpréter les couleurs de la classification sont données ci-contre.
 
 \begin{figure}[h]
     \centering
@@ -384,7 +388,7 @@ On donne pour chacun des nuages de l'ensemble d'entraînement, de test ou de tes
     \subfloat[classification]{{\includegraphics[width=8cm]{fig/annexe/s_untermaederbrunnen3_pc.JPG} }}
     \qquad
     \subfloat[vérité terrain]{{\includegraphics[width=8cm]{fig/annexe/s_untermaederbrunnen3_gt.JPG} }}
-    \caption{Nuage de test : untermaederbrunnen3. Les résultats sont concluants pour ce nuage de test, pour chacune des classes une majorité de points a été bien classifiée. La segmentation est dans l'ensemble assez bonne où on note toutefois une faible portion de la \texttt{végétation} qui a été assimilée à du \texttt{terrain}.}
+    \caption{Nuage de test : untermaederbrunnen3. Les résultats sont concluants pour ce nuage de test, pour chacune des classes une majorité de points a été bien classifiée. La segmentation est dans l'ensemble assez bonne et on note toutefois qu'une faible portion de la \texttt{végétation} a été assimilée à du \texttt{terrain}.}
     \label{fig:untermaederbrunnen3}
 \end{figure}
 
@@ -397,7 +401,7 @@ On donne pour chacun des nuages de l'ensemble d'entraînement, de test ou de tes
     \subfloat[classification]{{\includegraphics[width=8cm]{fig/annexe/s_domfountain2_pc_2.JPG} }}
     \qquad
     \subfloat[vérité terrain]{{\includegraphics[width=8cm]{fig/annexe/s_domfountain2_gt.JPG} }}
-    \caption{Nuage de test : domfountain2. Les résultats sont moins bons sur ce nuage de test. Seules les classes \texttt{terrain}, \texttt{végétation haute} et \texttt{bâtiment} ont bien été classifiées. La \texttt{végétation basse} et les \texttt{aménagements urbains} ont été confondus avec les \texttt{bâtiments}, Les \texttt{artefacts de numérisation} on été pris pour des \texttt{aménagements urbains} et le peu de \texttt{voiture} qu'il y avait n'a pas été détecté en tant que tel. Toutefois la précision globale sur l'ensemble du nuage reste bonne car beaucoup de points appartiennent aux classes \texttt{terrain} et \texttt{bâtiment} qui ont bien été classifiées.}
+    \caption{Nuage de test : domfountain2. Les résultats sont moins bons sur ce nuage de test. Seules les classes \texttt{terrain}, \texttt{végétation haute} et \texttt{bâtiment} ont bien été classifiées. La \texttt{végétation basse} et les \texttt{aménagements urbains} ont été confondus avec les \texttt{bâtiments}, Les \texttt{artefacts de numérisation} on été pris pour des \texttt{aménagements urbains} et le peu de \texttt{voitures} qu'il y avait n'a pas été détecté en tant que tel. Toutefois la précision globale sur l'ensemble du nuage reste bonne car beaucoup de points appartiennent aux classes \texttt{terrain} et \texttt{bâtiment} qui ont bien été classifiées.}
     \label{fig:domfountain2}
 \end{figure}
 
@@ -423,7 +427,7 @@ On donne pour chacun des nuages de l'ensemble d'entraînement, de test ou de tes
     \subfloat[classification]{{\includegraphics[width=8cm]{fig/annexe/s_neugasse_pc.JPG} }}
     \qquad
     \subfloat[vérité terrain]{{\includegraphics[width=8cm]{fig/annexe/s_neugasse_gt.JPG} }}
-    \caption{Nuage de test : neugasse. Un constat à peu près similaire pour ce nuage de test. La classe \texttt{voiture}, peu représentée, n'a pas été très bien classifiée. On remarque un nombre de point élevé d'\texttt{artefacts de numérisation} qui ne facilite pas la segmentation du nuage, notamment avec l'assimilation d'une bonne partie de l'\texttt{aménagement urbain} aux \texttt{bâtiments}.}
+    \caption{Nuage de test : neugasse. Un constat à peu près similaire pour ce nuage de test. La classe \texttt{voiture}, peu représentée, n'a pas été très bien classifiée. On remarque un nombre de élevé d'\texttt{artefacts de numérisation}, ce qui ne facilite pas la segmentation du nuage, notamment avec l'assimilation d'une bonne partie de l'\texttt{aménagement urbain} aux \texttt{bâtiments}.}
     \label{fig:neugasse}
 \end{figure}
 
@@ -436,7 +440,7 @@ On donne pour chacun des nuages de l'ensemble d'entraînement, de test ou de tes
     \subfloat[classification]{{\includegraphics[width=8cm]{fig/annexe/s_bildstein3_pc.JPG} }}
     \qquad
     \subfloat[vérité terrain]{{\includegraphics[width=8cm]{fig/annexe/s_bildstein3_gt.JPG} }}
-    \caption{Nuage de test supplémentaire : bildstein3. Globalement une assez bonne classification pour ce nuage de test supplémentaire, en dépit des craintes liées à la présence d'une colline dans le nuage de point. Seules les classes \texttt{végétation basse} et \texttt{voiture} ont fait défaut, pourtant plutôt bien segmentées.}
+    \caption{Nuage de test supplémentaire : bildstein3. Globalement une assez bonne classification pour ce nuage de test supplémentaire, en dépit des craintes liées à la présence d'une colline dans le nuage de point. Seules les classes \texttt{végétation basse} et \texttt{voiture} ont fait défaut, pourtant plutôt bien segmentées, et on remarque sur l'image que les morceaux de la maison du fond ont été assimilés à de l'aménagement urbain (en jaune), probablement car l'acquisition est peu dense et le toit est absent.}
     \label{fig:bildstein3}
 \end{figure}
 
@@ -449,7 +453,7 @@ On donne pour chacun des nuages de l'ensemble d'entraînement, de test ou de tes
     \subfloat[classification]{{\includegraphics[width=8cm]{fig/annexe/s_bildstein5_pc.JPG} }}
     \qquad
     \subfloat[vérité terrain]{{\includegraphics[width=8cm]{fig/annexe/s_bildstein5_gt.JPG} }}
-    \caption{Nuage de test supplémentaire : bildstein5. On a, pour ce nuage de test supplémentaire, des résultats acceptables seulement sur les trois classes habituelles (\texttt{terrain}, \texttt{végétation haute} et \texttt{bâtiment}) avec toutefois une partie du terrain segmenté avec l'église à cause de la colline qui n'a permis d'isoler convenablement le sol. Le point le plus problématique est les \texttt{voitures} qui n'ont pas été très bien segmentée. La végétation basse a été confondue entre de multiples classes. Les autres classes ne sont que très peu représentées.}
+    \caption{Nuage de test supplémentaire : bildstein5. On a, pour ce nuage de test supplémentaire, des résultats acceptables seulement sur les trois classes habituelles (\texttt{terrain}, \texttt{végétation haute} et \texttt{bâtiment}) avec toutefois une partie du terrain segmenté avec l'église à cause de la colline qui n'a permis d'isoler convenablement le sol. Le point le plus problématique est les \texttt{voitures} qui n'ont pas été très bien segmentées. La végétation basse a été confondue entre de multiples classes. Les autres classes ne sont que très peu représentées.}
     \label{fig:bildstein5}
 \end{figure}
 
