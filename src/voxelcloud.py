@@ -9,6 +9,8 @@ from sklearn.neighbors import KDTree
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 from sklearn.cluster import SpectralClustering
+from sklearn.preprocessing import normalize
+from sklearn.decomposition import PCA
 
 from descriptors import local_PCA, features_from_PCA
 from RANSAC import RANSAC, in_plane
@@ -369,12 +371,19 @@ class VoxelCloud:
         print("Building similarity graph")
         A, D = self.build_similarity_graph(c_D, weights)
         L = D - A
+        eps = 1e-4
+        L += eps * sparse.eye(L.shape[0])
         print("Finding the eigendecomposition of the Laplacian graph... This may require time.")
-        eigenvalues, eigenvectors = sparse.linalg.eigsh(L, k=K)
+        eigenvalues, eigenvectors = sparse.linalg.eigsh(L, k=K, sigma=0)
         # eigenvalues, eigenvectors = np.linalg.eigh(L)
         print("Successfully diagonalized Laplacian matrix")
-        gm = GaussianMixture(K)
-        lbl = gm.fit_predict(eigenvectors[:,:K])
+        kmeans = KMeans(n_clusters=K)
+        #pca = PCA(n_components = 100)
+        #eigenvectors = pca.fit_transform(eigenvectors)
+        eigenvectors = normalize(eigenvectors)
+        lbl = kmeans.fit_predict(eigenvectors[:,:K])
+        # gm = GaussianMixture(K)
+        # lbl = gm.fit_predict(eigenvectors[:,:K])
         
         components_idx = np.unique(lbl)
         components = []
