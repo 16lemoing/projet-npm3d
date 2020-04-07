@@ -74,7 +74,7 @@ from mpl_toolkits.mplot3d import Axes3D
 #     plt.show()
 
 
-def plot(cloud, idxs = None, colors = None, only_voxel_center = True, also_unassociated_points = False, also_removed_points = False):
+def plot(cloud, idxs = None, colors = None, only_voxel_center = True, also_unassociated_points = False, also_removed_points = False, figsize = None):
     
     if idxs is None:
         idxs = list(range(len(cloud)))
@@ -95,7 +95,7 @@ def plot(cloud, idxs = None, colors = None, only_voxel_center = True, also_unass
     else:
         cloudtype = "voxel"
     
-    fig = plt.figure()
+    fig = plt.figure(figsize = figsize)
     ax = fig.add_subplot(111, projection='3d')
     for i in range(len(idxs)):
         if only_voxel_center:

@@ -1,0 +1,14 @@
+% Test set precision metrics with and without color and intensity information
+\begin{table}[p]
+\tiny
+\begin{tabular}{l|c|c|c|c|c|c|c|c|c|c|c|c|}
+\cline{2-13}
+                                                  & \multicolumn{4}{c|}{données d'entraînement}                                  & \multicolumn{8}{c|}{données de test}                                                                                                             \\ \cline{2-13} 
+                                                  & \multicolumn{2}{c|}{domfountain1} & \multicolumn{2}{c|}{untermaederbrunnen1} & \multicolumn{2}{c|}{domfountain2} & \multicolumn{2}{c|}{domfountain3} & \multicolumn{2}{c|}{neugasse} & \multicolumn{2}{c|}{untermaederbrunnen3} \\ \cline{2-13} 
+                                                  & comp.            & point          & comp.               & point              & comp.           & point           & comp.           & point           & comp.         & point         & comp.               & point              \\ \hline
+\multicolumn{1}{|l|}{avec couleur et reflectance} & 99               & \textbf{98}    & \textbf{100}        & \textbf{96}        & \textbf{96}     & \textbf{95}     & \textbf{96}     & \textbf{95}     & \textbf{98}   & \textbf{92}   & \textbf{99}         & \textbf{96}        \\ \hline
+\multicolumn{1}{|l|}{sans couleur ni reflectance} & \textbf{100}     & \textbf{98}    & \textbf{100}        & \textbf{96}        & \textbf{96}     & 94              & \textbf{96}     & \textbf{95}     & 97            & \textbf{92}   & \textbf{99}         & 95                 \\ \hline
+\end{tabular}
+\caption{Précision (\%) au niveau des composantes connexes et des points, avec et sans l'information de couleur et de reflectance. Nous obtenons des résultats très similaire dans les deux configurations.}
+\label{table:laser_color}
+\end{table}
