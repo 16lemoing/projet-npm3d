@@ -50,7 +50,7 @@ c = vc.features['mean_color']
 plot(vc, colors = c, also_unassociated_points = True, only_voxel_center = False)
 
 # For spectral clustering : creating the graph and plotting it with the appropriate color
-A, D = vc.build_similarity_graph(0.25, [1,1,1])
+A, D = vc.build_similarity_graph(0.25, [1,1,1], sparse_matrix=False)
 g = nx.from_numpy_matrix(A)
 nx.draw(g, node_color = np.hstack((c/255, np.ones((len(c), 1)))))
 
