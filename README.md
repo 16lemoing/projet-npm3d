@@ -6,6 +6,10 @@ Le traitement automatisé de nuages de points en trois dimensions présente un d
 La méthode proposée dans l\'article [1] propose d\'agréger les données 3D en voxels sur lesquels sera ensuite effectué le traitement de classification.
 Le but de ce projet est de mettre en œuvre, d\'analyser et de proposer une approche critique de cette méthode pour la mettre en contexte avec les données et les réalités applicatives.
 
+## Premiers pas et utilisation
+Le fichier bin/tests.py peut servir à faire ses premiers pas avec les outils que nous avons développés. Il ne permet toutefois pas de faire de classification. Pour ceci, vous pouvez utiliser le fichier bin/pipeline.py pour exécuter la séquence complète d'apprentissage et de classification de différents nuages, en adaptant les paramètres en fonction de vos souhaits et des données présentes sur votre machine.
+Les données sont à stocker dans le sous-répertoire data/
+
 ## Rapport
 Le rapport du projet est disponible [ici](docs/rapport-09042020.pdf).
 
