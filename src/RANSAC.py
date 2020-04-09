@@ -63,7 +63,8 @@ def RANSAC(points, normals=None, NB_RANDOM_DRAWS=100, threshold_in=0.1, threshol
     NB_RANDOM_DRAWS : number of tries: the biggest plane of all draws will be taken
     threshold_in : float : distance threshold telling whether a point belongs to a plane or not
     threshold_normals : float : if normals is provided, the angle between the normals of the plane 
-                        should not be greater than this threshold
+                        should not be greater than this threshold, moreover the projection of the
+                        normal of the plane on z axis should be greater than this threshold
     
     Returns
     -------
