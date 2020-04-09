@@ -38,7 +38,7 @@
 \vspace{1cm}\hrule\vspace{1cm}
 }
 \author{Guillaume LE MOING, Hugues SOUCHARD DE LAVOREILLE}
-\date{\vspace{12cm} Mars 2020}
+\date{\vspace{12cm} Avril 2020}
 
 \newcommand{\TODO}{\fbox{\textcolor{red}{TODO}}}
 \newcommand{\R}{\mathbb{R}}
@@ -225,7 +225,7 @@ Une dernière difficulté : les composantes connexes étant assez denses, des vo
 
 Nous avons enfin choisi comme classifieur un \emph{Random Forest} (forêt d'arbres décisionnels) composée de $20$ arbres de décision. Une fois le classifieur de voisinage appris, nous pouvons appliquer cette relation de voisinage à de nouveaux nuages de points et ainsi déterminer les composantes connexes de ces nuages.
 
-La figure \ref{fig:resultat-segmentation-supervisee} montre le résultat de cette méthode appliquée à la ségmentation de la même scène que précédemment. On parvient à bien identifier la maison, l'arbre ainsi que le sol. Les objets au dessus du sol forment des amas unis. En prenant un seuil de tolérance trop permissif lors de la détection du sol, le toit de la voiture est souvent assimilé à du sol, cela a été réglé en optimisant ce seuil. Cependant, dans le cas présent, la voiture est détectée en plusieurs morceaux, ce qui ne facilitera pas sa classification.
+La figure \ref{fig:resultat-segmentation-supervisee} montre le résultat de cette méthode appliquée à la segmentation de la même scène que précédemment. On parvient à bien identifier la maison, l'arbre ainsi que le sol. Les objets au dessus du sol forment des amas unis. En prenant un seuil de tolérance trop permissif lors de la détection du sol, le toit de la voiture est souvent assimilé à du sol, cela a été réglé en optimisant ce seuil. Cependant, dans le cas présent, la voiture est détectée en plusieurs morceaux, ce qui ne facilitera pas sa classification.
 
 \begin{figure}[h]
     \centering
@@ -244,10 +244,10 @@ La méthode de classification introduite repose sur l'agrégation des caractéri
 
 Cependant, la méthode exacte de \cite{aka_article} est peu détaillée et repose sur de simples seuils arbitrairement choisis sur certaines fonctions des caractéristiques des voxels. Nous avons donc décidé d'appuyer notre méthode sur les mêmes paramètres (que nos avons d'ailleurs enrichis) et d'apprendre de manière supervisée la classification des composantes connexes. Pour reprendre les catégories de paramètres spécifiées dans \cite{aka_article}, nous avons considéré les paramètres liés :
 \begin{itemize}
-\item \textbf{Aux normales} : la moyenne et la variance de la projection des normales des voxels de la composante connexe sur l'axe z ainsi que sur le plan défini par les axes x et y.
-\item \textbf{Au centre géométrique et au barycentre} : le centre géométrique de la composante connexe calculé à partir de l'ensemble des voxels de celle-ci, même chose pour le barycentre.
-\item \textbf{A la couleur et l'intensité} : la moyenne et la variance des couleurs et de la réflectance laser des voxels de la composante connexe.
-\item \textbf{A la forme géométrique} : les valeurs propres et vecteurs de la \emph{Principal Component Analysis} (PCA) des centres géométriques des voxels de la composante connexe, la moyenne de la verticalité, linéarité, planarité et sphéricité  des voxels de la composante connexe, le nombre de voxels dans la composante connexe et la taille de la composante connexe.
+\item \textbf{aux normales} : la moyenne et la variance de la projection des normales des voxels de la composante connexe sur l'axe z ainsi que sur le plan défini par les axes x et y.
+\item \textbf{au centre géométrique et au barycentre} : le centre géométrique de la composante connexe calculé à partir de l'ensemble des voxels de celle-ci, même chose pour le barycentre.
+\item \textbf{à la couleur et l'intensité} : la moyenne et la variance des couleurs et de la réflectance laser des voxels de la composante connexe.
+\item \textbf{à la forme géométrique} : les valeurs propres et vecteurs de la \emph{Principal Component Analysis} (PCA) des centres géométriques des voxels de la composante connexe, la moyenne de la verticalité, linéarité, planarité et sphéricité  des voxels de la composante connexe, le nombre de voxels dans la composante connexe et la taille de la composante connexe.
 \end{itemize}
 La taille des données s'y prêtant bien, nous avons choisi comme classifieur un \emph{Random Forest} (forêt d'arbres décisionnels) composée de $20$ arbres de décision. Il suffit alors d'utiliser les étiquettes \emph{labels} fournis dans le jeu de données et d'apprendre à classifier les objets en fonction de leurs \emph{features}.
 
@@ -257,9 +257,9 @@ Afin dévaluer la pertinence de la classification nous proposons plusieurs métr
 
 Tout d'abord des calculs de précision :
 \begin{itemize}
-\item \textbf{Au niveau des composantes connexes} On attribue à l'ensemble des points de chaque composante connexe un unique label par vote de majorité sur les voxels qui la constituent. En effet, la segmentation n'étant pas toujours parfaite il se peut que des voxels de différents labels se retrouvent segmentés dans un même objet. On compare ensuite ce label de vérité terrain (obtenu par vote) au label prédit par le classifieur en chacun des points. Cette métrique permet de comparer la classification prédite à la meilleure classification possible en vue de la segmentation obtenue. Ainsi on peut évaluer la classification en se soustrayant des problèmes introduits par une mauvaise segmentation.
+\item \textbf{au niveau des composantes connexes} On attribue à l'ensemble des points de chaque composante connexe un unique label par vote de majorité sur les voxels qui la constituent. En effet, la segmentation n'étant pas toujours parfaite il se peut que des voxels de différents labels se retrouvent segmentés dans un même objet. On compare ensuite ce label de vérité terrain (obtenu par vote) au label prédit par le classifieur en chacun des points. Cette métrique permet de comparer la classification prédite à la meilleure classification possible en vue de la segmentation obtenue. Ainsi on peut évaluer la classification en se soustrayant des problèmes introduits par une mauvaise segmentation.
 
-\item \textbf{Au niveau des points} On peut également calculer la précision au niveau des points. Par ceci, on entend que la vérité terrain est donnée en chacun des points (et non plus pour chaque composante). Dans notre méthode, certains points ont été mis de côté parce qu'ils appartenaient à un voxel trop petit ou un voxel qui lui-même appartenait à un objet trop petit. Afin d'être plus juste, lors de la prédiction on attribue à ces points le label prédit du voxel le plus proche parmi les voxels qui appartiennent à des composantes connexes. Cette métrique rend compte de la qualité de la classification tout comme de la qualité de la segmentation.
+\item \textbf{au niveau des points} On peut également calculer la précision au niveau des points. Par ceci, on entend que la vérité terrain est donnée en chacun des points (et non plus pour chaque composante). Dans notre méthode, certains points ont été mis de côté parce qu'ils appartenaient à un voxel trop petit ou un voxel qui lui-même appartenait à un objet trop petit. Afin d'être plus juste, lors de la prédiction on attribue à ces points le label prédit du voxel le plus proche parmi les voxels qui appartiennent à des composantes connexes. Cette métrique rend compte de la qualité de la classification tout comme de la qualité de la segmentation.
 \end{itemize}
 
 Notons que l'article \cite{aka_article} propose une troisième voie, différente en évaluant l'erreur de classification au niveau des voxels. Ayant déjà deux métriques très complémentaires, nous n'avons pas jugé utile d'en utiliser une troisième dont les résultats devraient, en toute logique, se situer entre les résultats des deux métriques que nous venons de mentionner.
@@ -281,9 +281,15 @@ Cette implémentation reprend quelques éléments du code de Hugues Thomas\footn
 Les données mentionnées en 2013 dans l'article \cite{aka_article} n'étant plus disponibles en ligne en 2020, nous avons travaillé sur le jeu de données \texttt{semantic-8} de \href{http://www.semantic3d.net/}{\emph{Semantic3D}} \cite{hackel2017isprs}. Celles-ci ont l'avantage de comporter non seulement les données d'intensité de réflectance laser mais aussi de couleur RGB de chaque point, en plus d'être partiellement classifiées. Ce dernier point nous a permis de mettre en place une méthode de classification par apprentissage.
 Nous avons d'abord réalisé nos expérimentations sur une version réduite du nuage \texttt{bildstein5} avant d'appliquer notre méthode à de plus gros nuages. Finalement nous avons sélectionné \texttt{domfountain1} et \texttt{untermaederbrunnen1} comme nuages d'entraînement, ainsi que \texttt{domfountain2}, \texttt{domfountain3}, \texttt{neugasse} et \texttt{untermaederbrunnen3} pour le test. Deux autres nuages \texttt{bildstein3} et \texttt{bildstein5}, plus difficiles, car comportant une colline ont aussi été utilisés pour tester davantage notre méthode. Les classes des différents objets fournis avec les nuages de points sont les suivantes : \texttt{terrain artificiel}, \texttt{terrain naturel}, \texttt{végétation haute}, \texttt{végétation basse}, \texttt{bâtiment}, \texttt{aménagement urbain}, \texttt{artefact de numérisation} et \texttt{voiture}. Nous n'avons gardé que les points annotés de ces nuages et avons fusionné les classes \texttt{terrain artificiel} et \texttt{terrain naturel} en \texttt{terrain} pour n'avoir qu'un seul type de sol, comme dans l'article que nous avons étudié.
 
+Un extrait des données que nous avons utilisées est disponible à l'adresse suivante : 
+\begin{center}
+\url{https://cloud.mines-paristech.fr/index.php/s/ynK12DvoOrJ1LWA}
+\end{center}
+Tous les nuages ne sont pas disponibles mais ceux-ci permettront déjà au lecteur intéressé de mener ses premières expérimentations. Les données dans ce répertoire sont directement transformées à partir des données de \textit{Semantic3D} et sont disponibles sous licence CC BY-NC-SA 3.0.
+
 \subsection{Résultats}
 
-Les résultats globaux de la méthode la plus concluante sont visibles dans l'annexe, nuage par nuage. Nous avons choisi de comparer nos résultats à ceux de l'article \cite{aka_article} en utilisant les matrices de confusion qui permettent un examen plus précis de la répartition entre les différentes classes.
+Les résultats globaux de la méthode la plus concluante sont visibles dans l'annexe \ref{annexe-resultats}, nuage par nuage. Nous avons choisi de comparer nos résultats à ceux de l'article \cite{aka_article} en utilisant les matrices de confusion qui permettent un examen plus précis de la répartition entre les différentes classes.
 
 Nous présentons dans le reste de cette partie les résultats de certains points particuliers de notre implémentation des sous-méthodes et variantes détaillées dans les sections précédentes.
 
@@ -296,11 +302,45 @@ Comme nous l'avons vu précédemment dans la partie \ref{segmentation-sol}, nous
     \subfloat[sans segmentation du sol]{{\includegraphics[width=8cm]{fig/test_without_ground_segmentation.png} }}
     \qquad
     \subfloat[avec segmentation du sol]{{\includegraphics[width=8cm]{fig/test_with_ground_segmentation.png} }}
-    \caption{Matrices de confusion pour le test, avec et sans segmentation du sol. On observe que sans segmentation du sol, en majorité trois classes sont détectées : le \texttt{terrain}, la \texttt{végétation haute} et les \texttt{bâtiments}. La \texttt{végétation basse} est confondue en grande partie avec le \texttt{terrain}. Les \texttt{voitures} et les \texttt{aménagements urbains} sont confondus entre le \texttt{terrain} et les \texttt{bâtiments}. Le \texttt{terrain} est quand à lui en grande partie assimilé aux \texttt{bâtiments}. Avec notre méthode de segmentation du sol, on voit une nette amélioration pour le \texttt{terrain}, d'une part celui-ci est bien mieux classifié, d'autre part beaucoup moins de classes sont confondues avec lui.}
+    \caption{Matrices de confusion pour le jeu de données de test, avec et sans segmentation du sol. On observe que sans segmentation du sol, en majorité trois classes sont détectées : le \texttt{terrain}, la \texttt{végétation haute} et les \texttt{bâtiments}. La \texttt{végétation basse} est confondue en grande partie avec le \texttt{terrain}. Les \texttt{voitures} et les \texttt{aménagements urbains} sont confondus entre le \texttt{terrain} et les \texttt{bâtiments}. Le \texttt{terrain} est quand à lui en grande partie assimilé aux \texttt{bâtiments}. Avec notre méthode de segmentation du sol, on voit une nette amélioration pour le \texttt{terrain}, d'une part celui-ci est bien mieux classifié, d'autre part beaucoup moins de classes sont confondues avec lui.}
     \label{fig:ground}
 \end{figure}
 
-\input{tables/ground}
+% Test set precision metrics with and without ground segmentation
+\begin{table}[p]
+\caption{Précision (\%) au niveau des composantes connexes et des points, avec et sans segmentation du sol. On remarque une amélioration notable de la précision lorsque la vérité terrain est donnée au niveau des points. Cette amélioration est valable pour les données d'entraînement comme pour les données de test. Pour ce qui est de la précision lorsque la vérité terrain est donnée au niveau des composantes connexes, on remarques qu'avec notre méthode de segmentation du sol on obtient un score correct pour l'ensemble des nuages (entraînement et test), là où auparavant la classification pouvait être tout à fait fausse pour certains nuages du jeu de données de test (score proche de $0$\%).}
+
+\begin{tabular}{l|c|c|c|c|}
+\cline{2-5}
+ & \multicolumn{4}{c|}{données d'entraînement} \\ 
+\cline{2-5} 
+ & \multicolumn{2}{c|}{domfountain1} & \multicolumn{2}{c|}{untermaederbrunnen1} \\
+\cline{2-5} 
+ & comp. & point & comp. & point \\
+\hline
+\multicolumn{1}{|l|}{sans segmentation du sol} & \textbf{100} & 56 & 99 & 51 \\
+\hline
+\multicolumn{1}{|l|}{avec segmentation du sol} & \textbf{100} & \textbf{92} & \textbf{100} & \textbf{93}\\
+\hline
+\end{tabular}
+
+\bigskip
+
+\begin{tabular}{l|c|c|c|c|c|c|c|c|}
+\cline{2-9}
+ & \multicolumn{8}{c|}{données de test}\\ 
+\cline{2-9}
+ & \multicolumn{2}{c|}{domfountain2} & \multicolumn{2}{c|}{domfountain3} & \multicolumn{2}{c|}{neugasse} & \multicolumn{2}{c|}{untermaederbrunnen3} \\ 
+\cline{2-9}
+& comp. & point & comp. & point & comp. & point & comp. & point\\
+\hline
+\multicolumn{1}{|l|}{sans segmentation du sol} & \textbf{99} & 57 & 2 & 46 & \textbf{99} & 52 & 2 & 38 \\
+\hline
+\multicolumn{1}{|l|}{avec segmentation du sol} & 94 & \textbf{92} & \textbf{95} & \textbf{94} & 97 & \textbf{91} & \textbf{90} & \textbf{85}\\
+\hline
+\end{tabular}
+\label{table:ground}
+\end{table}
 
 \raggedbottom
 
@@ -317,7 +357,42 @@ Une autre amélioration que nous avons proposée est l'apprentissage supervisé 
     \label{fig:neighbourhood}
 \end{figure}
 
-\input{tables/neighbourhood}
+% Test set precision metrics with and without neighbourhood classifier
+\begin{table}[p]
+
+\caption{Précision (\%) au niveau des composantes connexes et des points, avec et sans apprentissage de la relation de voisinage. Pour les nuages de l'ensemble d'entraînement on remarque un amélioration de la précision lorsque la vérité terrain est donnée au niveau des points. Ceci témoigne directement du fait que la segmentation est meilleure avec l'apprentissage de la relation de voisinage. De même, pour les nuages de test on a globalement de meilleurs résultats lorsque la relation de voisinage est apprise.}
+
+
+\begin{tabular}{l|c|c|c|c|}
+\cline{2-5} & \multicolumn{4}{c|}{données d'entraînement} \\
+\cline{2-5} & \multicolumn{2}{c|}{domfountain1} & \multicolumn{2}{c|}{untermaederbrunnen1} \\
+\cline{2-5} & comp. & point & comp. & point \\
+\hline
+\multicolumn{1}{|l|}{critère de voisinage} & \textbf{100} & 92 & \textbf{100} & 93 \\
+\hline
+\multicolumn{1}{|l|}{apprentissage supervisé} & 99 & \textbf{98} & \textbf{100} & \textbf{96}\\
+\hline
+\end{tabular}
+
+\bigskip
+
+\begin{tabular}{l|c|c|c|c|c|c|c|c|}
+\cline{2-9}
+& \multicolumn{8}{|c|}{données de test}\\
+\cline{2-9}
+& \multicolumn{2}{|c|}{domfountain2} & \multicolumn{2}{c|}{domfountain3} & \multicolumn{2}{c|}{neugasse} & \multicolumn{2}{c|}{untermaederbrunnen3}\\
+\cline{2-9}
+& comp. & point & comp. & point & comp. & point & comp. & point \\
+\hline
+\multicolumn{1}{|l|}{critère de voisinage} & 94 & 92 & 95 & 94 & 97 & 91 & 90 & 85\\
+\hline
+\multicolumn{1}{|l|}{apprentissage supervisé} & \textbf{96} & \textbf{95} & \textbf{96} & \textbf{95} & \textbf{98} & \textbf{92} & \textbf{99} & \textbf{96}\\
+\hline
+
+
+\end{tabular}
+\label{table:neighbourhood}
+\end{table}
 
 \subsubsection{Influence de la réflectance laser et de la couleur}
 
@@ -336,15 +411,48 @@ On remarquera toutefois que les classes qui font le plus défaut aujourd'hui (\t
     \label{fig:laser_color}
 \end{figure}
 
-\input{tables/laser_color}
+% Test set precision metrics with and without color and intensity information
+\begin{table}[p]
+\caption{Précision (\%) au niveau des composantes connexes et des points, avec et sans l'information de couleur et de réflectance. Nous obtenons des résultats très similaires dans les deux configurations.}
 
+\begin{tabular}{l|c|c|c|c|}
+\cline{2-5}
+ & \multicolumn{4}{c|}{données d'entraînement} \\
+\cline{2-5} 
+ & \multicolumn{2}{c|}{domfountain1} & \multicolumn{2}{c|}{untermaederbrunnen1} \\
+\cline{2-5} 
+ & comp. & point & comp. & point \\
+\hline
+\multicolumn{1}{|l|}{avec couleur et reflectance} & 99 & \textbf{98} & \textbf{100} & \textbf{96}\\
+\hline
+\multicolumn{1}{|l|}{sans couleur ni reflectance} & \textbf{100} & \textbf{98} & \textbf{100} & \textbf{96} \\
+\hline
+\end{tabular}
+
+\bigskip
+
+\begin{tabular}{l|c|c|c|c|c|c|c|c|}
+\cline{2-9}
+ & \multicolumn{8}{c|}{données de test}\\
+\cline{2-9} 
+ & \multicolumn{2}{c|}{domfountain2} & \multicolumn{2}{c|}{domfountain3} & \multicolumn{2}{c|}{neugasse} & \multicolumn{2}{c|}{untermaederbrunnen3} \\
+\cline{2-9} 
+ & comp.& point & comp. & point & comp. & point & comp. & point \\
+\hline
+\multicolumn{1}{|l|}{avec couleur et reflectance} & \textbf{96} & \textbf{95} & \textbf{96} & \textbf{95} & \textbf{98} & \textbf{92} & \textbf{99} & \textbf{96}\\
+\hline
+\multicolumn{1}{|l|}{sans couleur ni reflectance} & \textbf{96} & 94 & \textbf{96} & \textbf{95} & 97 & \textbf{92} & \textbf{99} & 95 \\
+\hline
+\end{tabular}
+\label{table:laser_color}
+\end{table}
 \subsubsection{Comparaison aux résultats de l'article}
 
-Les résultats présentés ici sont sensiblement moins bons que les résultats de l'article \cite{aka_article} (notamment lorsque l'on compare les matrices de confusion). Là où \cite{aka_article} obtient un minimum de $80$\% de réussite par classe sur les scènes de test, nous n'avons de résultats tels seulement pour $3$ ou $4$ classes sur $7$ suivant les scènes de test. Plusieurs éléments permettent d'entrevoir pourquoi. Tout d'abord, les classes à identifier dans notre jeu de données (\emph{Semantic3D}) sont plus diversifiées. Nous devons distinguer \texttt{végétation haute} (arbres) et \texttt{végétation basse} (petits buissons) alors que dans \cite{aka_article} seules les \texttt{arbres} sont à détecter. Autre difficulté, la classe \texttt{aménagement urbain} de notre jeu de données regroupe des objets variés (muret, décoration, panneau de signalisation, panneau publicitaire,  ...) alors que dans \cite{aka_article} on ne traite que les  \texttt{poteaux}. Cette diversité fait que des objets de classes différentes peuvent avoir un certain nombre de caractérisitiques communes. Dans ce contexte, la classification est donc plus difficile. Cette plus grande complexité explique aussi pourquoi la relation de voisinage introduite dans \cite{aka-article} et basée le seuillage de quelques paramètres ne marche pas aussi bien que l'apprentissage supervisé de la relation de voisinage sur cette base de données. De plus nous devons traiter des scènes urbaines comme rurales alors que dans \cite{aka-article} elles sont exclusivement urbaines. Une difficulté supplémentaire est la non planarité des sols. Enfin, les scènes étudiées ici sont plus étendues que dans \cite{aka-article}. Certains objets éloignés de la source d'acquisition sont peu denses et seulement partiellement visibles, ce qui semble être moins le cas des jeux de données utilisés dans \cite{aka-article}.
+Les résultats présentés ici sont sensiblement moins bons que les résultats de l'article \cite{aka_article} (notamment lorsque l'on compare les matrices de confusion). Là où les auteurs obtiennent un minimum de $80$\% de réussite par classe sur les scènes de test, nous n'avons de résultats tels seulement pour $3$ ou $4$ classes sur $7$ suivant les scènes de test. Plusieurs éléments permettent d'entrevoir pourquoi. Tout d'abord, les classes à identifier dans notre jeu de données (\emph{Semantic3D}) sont plus diversifiées. Nous devons distinguer \texttt{végétation haute} (arbres) et \texttt{végétation basse} (petits buissons) alors que dans l'article qui nous a servi de point de départ, seules les \texttt{arbres} sont à détecter. Autre difficulté, la classe \texttt{aménagement urbain} de notre jeu de données regroupe des objets variés (muret, décoration, panneau de signalisation, panneau publicitaire,  ...) alors que dans l'article, on ne traite que les \texttt{poteaux}. Cette diversité fait que des objets de classes différentes peuvent avoir un certain nombre de caractéristiques communes. Dans ce contexte, la classification est donc plus difficile. Cette plus grande complexité explique aussi pourquoi la relation de voisinage introduite dans \cite{aka_article} et basée le seuillage de quelques paramètres ne marche pas aussi bien que l'apprentissage supervisé de la relation de voisinage sur cette base de données. De plus nous devons traiter des scènes urbaines comme rurales alors qu'elles sont exclusivement urbaines dans l'article. Une difficulté supplémentaire est la non planarité des sols. Enfin, les scènes étudiées ici sont plus étendues que dans \cite{aka_article}. Certains objets éloignés de la source d'acquisition sont peu denses et seulement partiellement visibles, ce qui semble être moins le cas des jeux de données utilisés par les auteurs de l'article.
 
 \subsection{Conclusion}
 
-Lors de ce projet nous avons tenté de reproduire la méthode introduite dans \cite{aka_article}. Nous nous sommes attachés à l'améliorer sur un point qui nous a semblé un peu fragile dans la méthode d'origine : le choix de seuils souvent arbitraires pour segmenter le nuage et classifier les différents objets. Nous nous sommes aperçu, par exemple, que l'application de la méthode telle quelle sur une nouvelle base de données ne donnait pas des résultats optimaux. Nous avons détaillé une méthode robuste pour segmenter le sol. Puis nous avons proposé deux méthodes alternatives pour la segmentation : une méthode de partitionnement spectral et l'apprentissage supervisé de la relation de voisinage. La méthode par l'apprentissage supervisé a permis d'améliorer les résultats de segmentation et donc, dans le même temps, de classification. Nous avons également proposé d'utiliser l'apprentissage supervisé pour l'étape de classification. Les résultats ne sont pas encore parfaits mais sont plutôt encourageant. Ils pourraient être largement améliorés avec un entraînement sur une plus grande base de données. Ceci serait même possible dans notre \emph{framework}, puisqu'il permet l'apprentissage simultané sur plusieurs nuages de points.
+Lors de ce projet nous avons tenté de reproduire la méthode introduite dans \cite{aka_article}. Nous nous sommes attachés à l'améliorer sur un point qui nous a semblé un peu fragile dans la méthode d'origine : le choix de seuils souvent arbitraires pour segmenter le nuage et classifier les différents objets. Nous nous sommes aperçu, par exemple, que l'application de la méthode telle quelle sur une nouvelle base de données ne donnait pas des résultats optimaux. Nous avons détaillé une méthode robuste pour segmenter le sol. Puis nous avons proposé deux méthodes alternatives pour la segmentation : une méthode de partitionnement spectral et l'apprentissage supervisé de la relation de voisinage. La méthode par partitionnement spectral, si elle a du potentiel, nécessiterait un examen plus approfondi des données ainsi que de la modélisation de l'affinité (la similarité). La méthode par l'apprentissage supervisé a pour sa part immédiatement permis d'améliorer les résultats de segmentation et donc, dans le même temps, de classification. Nous avons également proposé d'utiliser l'apprentissage supervisé pour l'étape de classification. Les résultats ne sont pas encore parfaits mais sont plutôt encourageants. Ils pourraient être largement améliorés avec un entraînement sur une plus grande base de données. Ceci serait même possible dans notre \emph{framework}, puisqu'il permet l'apprentissage simultané sur plusieurs nuages de points.
 
 \clearpage
 \newpage
@@ -356,6 +464,7 @@ Lors de ce projet nous avons tenté de reproduire la méthode introduite dans \c
 \newpage
 \appendix
 \section{Détail des performances de classification par nuage}
+\label{annexe-resultats}
 
 \begin{wrapfigure}{r}{5cm}
 \centering
