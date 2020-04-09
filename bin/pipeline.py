@@ -11,15 +11,15 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 from utils.ply import read_ply, write_ply, make_ply
-from plots import plot
+from plots import plot, plot_confusion_matrix
 from pointcloud import PointCloud
 from voxelcloud import VoxelCloud
 from componentcloud import ComponentCloud
-from classifiers import ComponentClassifier
+from classifiers import NeighbourhoodClassifier, ComponentClassifier
 
 # %% Make ply files for clouds
 
-make_ply("../data/other/untermaederbrunnen_station1_xyz_intensity_rgb.txt", "../data/labels/untermaederbrunnen_station1_xyz_intensity_rgb.labels", "../data/original_clouds/untermaederbrunnen1.ply", masked_label=0)
+make_ply("../data/other/bildstein_station1_xyz_intensity_rgb.txt", "../data/labels/bildstein_station1_xyz_intensity_rgb.labels", "../data/original_clouds/domfountain1.ply", masked_label=0)
 
 # %% Relabel clouds (merge 2 terrain classes)
 
@@ -90,11 +90,52 @@ cc_backup_folder = Path("..") / "data" / "backup" / "component_cloud"
 overwrite = False
 c_D = 0.25
 segment_out_ground = True
+threshold_in = 0.7 # for ground detection
+threshold_normals = 0.8 # for ground detection
 min_component_length = 5
+use_neighbourhood_classifier = True
+train_vc_files_for_classifier = ["domfountain1.pkl", "untermaederbrunnen1.pkl"]
+classifier_type = 'random_forest' #'SGD'
+classifier_kwargs = {'n_estimators': 20} #{}
+scale_data = True
+use_color = True
+use_reflectance = True
+method = "normal"
+K = 500
+
+def filter_data(vc, use_color, use_reflectance):
+    if not use_color:
+        vc.pointcloud.rgb_colors = None
+    if not use_reflectance:
+        vc.pointcloud.laser_intensity = None
 
 if not cc_backup_folder.exists():
     cc_backup_folder.mkdir()
 
+# Train neighbourhood classifier if needed
+if use_neighbourhood_classifier:
+    
+    # Retrieve voxel clouds from training set
+    print("Loading voxel clouds for training neighbourhood classifier")
+    train_vc = []
+    for filename in train_vc_files_for_classifier:
+        pkl_file = vc_backup_folder / filename
+        with open(pkl_file, 'rb') as handle:
+            vc = pickle.load(handle)
+            filter_data(vc, use_color, use_reflectance)
+            train_vc.append(vc)
+
+    # Declare classifier
+    print("Constructing neighbourhood classifier")
+    neighbourhood_classifier = NeighbourhoodClassifier(classifier_type, classifier_kwargs, scale_data, c_D, segment_out_ground, threshold_in, threshold_normals)
+    
+    # Train classifier
+    print("Training neighbourhood classifier")
+    neighbourhood_classifier.fit(train_vc)
+else:
+    neighbourhood_classifier = None
+        
+# Create Component Cloud objects
 for pkl_file in vc_backup_folder.glob("*.pkl"):
     backup_file = cc_backup_folder / pkl_file.name
     if overwrite or not backup_file.exists():
@@ -103,29 +144,39 @@ for pkl_file in vc_backup_folder.glob("*.pkl"):
         # Retrieve voxel cloud
         with open(pkl_file, 'rb') as handle:
             vc = pickle.load(handle)
+            filter_data(vc, use_color, use_reflectance)
+        
+        # Assign trained neighbourhood classifier to voxel cloud
+        # If 'neighbourhood_classifier' is None, standard neighbourhood criteria (from paper) will be applied
+        vc.set_neighbourhood_classifier(neighbourhood_classifier)
         
         # Compute component cloud
-        cc = ComponentCloud(vc, c_D = c_D, segment_out_ground = segment_out_ground, min_component_length = min_component_length)
+        cc = ComponentCloud(vc, c_D = c_D, method = method, K = K, segment_out_ground = segment_out_ground, threshold_in = threshold_in, threshold_normals = threshold_normals, min_component_length = min_component_length)
         
         # Save component cloud
         with open(backup_file, 'wb') as handle:
             pickle.dump(cc, handle, protocol=pickle.HIGHEST_PROTOCOL)
         print(f"Done making component cloud for: {pkl_file}\n")
-
+        
 # %% Classify components
 
 # Parameters
 cc_backup_folder = Path("..") / "data" / "backup" / "component_cloud"
-pc_backup_folder = Path("..") / "data" / "backup" / "predicted_cloud_2"
-train_cc_files = ["bildstein_station3_xyz_intensity_rgb_labeled.pkl"]
-test_cc_files = ["bildstein_station5_xyz_intensity_rgb_test_extract.pkl"]
+pc_backup_folder = Path("..") / "data" / "backup" / "predicted_cloud"
+plot_backup_folder = Path("..") / "data" / "backup" / "new_plot"
+train_cc_files = ["domfountain1.pkl", "untermaederbrunnen1.pkl"]
+test_cc_files = ["domfountain2.pkl", "domfountain3.pkl", "neugasse.pkl", "untermaederbrunnen3.pkl"]
+extra_test_cc_files = ["bildstein3.pkl", "bildstein5.pkl"]
 classes = {2: "terrain", 3: "high vegetation", 4: "low vegetation", 5: "buildings", 6:"hard scape", 7:"scanning artefacts", 8:"cars"}
 classifier_type = 'random_forest'
 classifier_kwargs = {'n_estimators': 20}
 scale_data = False
+id_experimentation = 5
 
 if not pc_backup_folder.exists():
     pc_backup_folder.mkdir()
+if not plot_backup_folder.exists():
+    plot_backup_folder.mkdir()
 
 # Load train data
 print("Loading train data")
@@ -145,6 +196,15 @@ for filename in test_cc_files:
         cc = pickle.load(handle)
         test_cc.append(cc)
 
+# Load extra test data
+print("Loading extra test data")
+extra_test_cc = []
+for filename in extra_test_cc_files:
+    pkl_file = cc_backup_folder / filename
+    with open(pkl_file, 'rb') as handle:
+        cc = pickle.load(handle)
+        extra_test_cc.append(cc)
+
 # Train classifier on train data
 print("Training classifier")
 cc_classifier = ComponentClassifier(classifier_type, classifier_kwargs, scale_data)
@@ -157,28 +217,34 @@ for i, cc in enumerate(train_cc):
     cc.set_predicted_labels(cc_classifier.predict(cc))
     cc.eval_classification_error(ground_truth_type = "componentwise")
     cc.eval_classification_error(ground_truth_type = "pointwise")
-    cm += cc.eval_classification_error(ground_truth_type = "pointwise", include_unassociated_points = True, classes = np.array(list(classes.keys())))
+    this_cm = cc.eval_classification_error(ground_truth_type = "pointwise", include_unassociated_points = True, classes = np.array(list(classes.keys())))
+    plot_confusion_matrix(this_cm, list(classes.values()), data_type = 'train_' + train_cc_files[i].split('.')[0], id = id_experimentation, folder = plot_backup_folder)
+    cm += this_cm
+plot_confusion_matrix(cm, list(classes.values()), data_type = 'train', id = id_experimentation, folder = plot_backup_folder)
 
-fig = plt.figure()
-ax = fig.add_subplot(111)
-cax = ax.matshow(cm)
-plt.title('Confusion matrix of the classifier on train data')
-fig.colorbar(cax)
-ax.set_xticklabels([''] + list(classes.values()))
-ax.set_yticklabels([''] + list(classes.values()))
-plt.xlabel('Predicted')
-plt.ylabel('True')
-plt.show()
-
-    
 # Evaluate classifier on test data
-confusion_matrix = np.zeros((len(classes), len(classes)))
+cm = np.zeros((len(classes), len(classes)))
 for i, cc in enumerate(test_cc):
     print(f"Evaluation of [TEST DATA] {test_cc_files[i]}")
     cc.set_predicted_labels(cc_classifier.predict(cc))
-    cc.eval_classification_error(ground_truth_type = "pointwise")
-    cc.eval_classification_error(ground_truth_type = "pointwise", include_unassociated_points=True)
     cc.eval_classification_error(ground_truth_type = "componentwise")
+    cc.eval_classification_error(ground_truth_type = "pointwise")
+    this_cm = cc.eval_classification_error(ground_truth_type = "pointwise", include_unassociated_points=True, classes = np.array(list(classes.keys())))
+    plot_confusion_matrix(this_cm, list(classes.values()), data_type = 'test_' + test_cc_files[i].split('.')[0], id = id_experimentation, folder = plot_backup_folder)
+    cm += this_cm
+plot_confusion_matrix(cm, list(classes.values()), data_type = 'test', id = id_experimentation, folder = plot_backup_folder)
+
+# Evaluate classifier on extra test data
+cm = np.zeros((len(classes), len(classes)))
+for i, cc in enumerate(extra_test_cc):
+    print(f"Evaluation of [EXTRA TEST DATA] {extra_test_cc_files[i]}")
+    cc.set_predicted_labels(cc_classifier.predict(cc))
+    cc.eval_classification_error(ground_truth_type = "componentwise")
+    cc.eval_classification_error(ground_truth_type = "pointwise")
+    this_cm = cc.eval_classification_error(ground_truth_type = "pointwise", include_unassociated_points=True, classes = np.array(list(classes.keys())))
+    plot_confusion_matrix(this_cm, list(classes.values()), data_type = 'extra_test_' + extra_test_cc_files[i].split('.')[0], id = id_experimentation, folder = plot_backup_folder)
+    cm += this_cm
+plot_confusion_matrix(cm, list(classes.values()), data_type = 'extra_test', id = id_experimentation, folder = plot_backup_folder)
 
 # Save train results (predicted components, predicted labels, groundtruth labels)
 print("Saving train results")
@@ -196,6 +262,18 @@ for i, cc in enumerate(train_cc):
 print("Saving test results")
 for i, cc in enumerate(test_cc):
     ply_file = pc_backup_folder / ('test_' + test_cc_files[i].replace('pkl', 'ply'))
+    cloud_point = np.vstack([cc.voxelcloud.features["geometric_center"][c] for c in cc.components])
+    component = np.hstack([random.random() * np.ones(len(c)) for c in cc.components])
+    predicted_label = np.hstack([cc.predicted_label[i] * np.ones(len(c)) for i, c in enumerate(cc.components)])
+    groundtruth_component_label = np.hstack([cc.majority_label[i] * np.ones(len(c)) for i, c in enumerate(cc.components)])
+    groundtruth_voxel_label = np.hstack([cc.voxelcloud.features['majority_label'][c] for c in cc.components])
+    write_ply(str(ply_file), [cloud_point, component, predicted_label, groundtruth_component_label, groundtruth_voxel_label],
+              ['x', 'y', 'z', 'predicted_component', 'predicted_label', 'groundtruth_component_label', 'groundtruth_voxel_label'])
+
+# Save extra test results (predicted components, predicted labels, groundtruth labels)
+print("Saving extra test results")
+for i, cc in enumerate(extra_test_cc):
+    ply_file = pc_backup_folder / ('test_' + extra_test_cc_files[i].replace('pkl', 'ply'))
     cloud_point = np.vstack([cc.voxelcloud.features["geometric_center"][c] for c in cc.components])
     component = np.hstack([random.random() * np.ones(len(c)) for c in cc.components])
     predicted_label = np.hstack([cc.predicted_label[i] * np.ones(len(c)) for i, c in enumerate(cc.components)])

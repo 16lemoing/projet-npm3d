@@ -33,9 +33,12 @@ def in_plane(points, normals, ref_pt, ref_normal, threshold_in=0.1, threshold_no
     Parameters
     ----------
     points : Nx3 numpy array
+    normals : estimation of local normals at each point
     ref_pt : 3-numpy array (a point of the plane)
     ref_normal : 3-numpy array (unit vector of the plane)
     threshold_in : float: maximum distance to the plane for points to belong to it
+    threshold_normals : float : if normals is provided, the angle between the normals of the plane 
+                        should not be greater than this threshold
 
     Returns
     -------
@@ -44,21 +47,25 @@ def in_plane(points, normals, ref_pt, ref_normal, threshold_in=0.1, threshold_no
     dists = np.einsum("i,ji->j", ref_normal, points - ref_pt)
     indices = abs(dists) < threshold_in
     if normals is not None:
-        normal_check = np.dot(ref_normal, normals.T) > threshold_normals
+        normal_check = abs(np.dot(ref_normal, normals.T)) > threshold_normals
         return indices & normal_check
     return indices
 
 
 def RANSAC(points, normals=None, NB_RANDOM_DRAWS=100, threshold_in=0.1, threshold_normals=0.8):
     """
-    Applies the RANSAC algorithm to find a plane
+    Applies the RANSAC algorithm to find an horizontal plane
 
     Parameters
     ----------
     points : Nx3 numpy array
+    normals: Nx3 numpy array, optional (estimation of local normals at each point)
     NB_RANDOM_DRAWS : number of tries: the biggest plane of all draws will be taken
     threshold_in : float : distance threshold telling whether a point belongs to a plane or not
-
+    threshold_normals : float : if normals is provided, the angle between the normals of the plane 
+                        should not be greater than this threshold, moreover the projection of the
+                        normal of the plane on z axis should be greater than this threshold
+    
     Returns
     -------
     best_ref_pt : 3-numpy array (point belonging to the best found plane)
@@ -85,53 +92,9 @@ def RANSAC(points, normals=None, NB_RANDOM_DRAWS=100, threshold_in=0.1, threshol
         nb = np.sum(in_plane(points, normals, ref_pt, ref_normal, threshold_in))
         
         # Updating the best plane if needed
-        if nb > best_nb:
+        if nb > best_nb and abs(ref_normal[2]) > threshold_normals:
             best_nb = nb
             best_ref_pt = ref_pt
             best_normal = ref_normal
                 
     return best_ref_pt, best_normal
-
-
-def multi_RANSAC(points, NB_RANDOM_DRAWS=100, threshold_in=0.1, NB_PLANES=2):
-    """
-    Applies the multi RANSAC algorithm to find several best planes
-
-    Parameters
-    ----------
-    points : Nx3 numpy array
-    NB_RANDOM_DRAWS : number of tries: the biggest plane of all draws will be taken
-    threshold_in : float : distance threshold telling whether a point belongs to a plane or not
-    NB_PLANES: int : the number of points we want to find
-
-    Returns
-    -------
-    plane_inds : 1d numpy array: the indices of all points belonging the the best planes
-    remaining_inds : 1d numpy array: all the other indices
-    plane_labels : 1d numpy array of ints (same size as plane_inds) : the labels of the planes
-                   of all points in plane_inds
-
-    """
-    
-    # This is the list of indices for which no planes have been found at the moment
-    # We will successively look inside it, remove the best plane and proces again
-    # until finding NB_PLANES planes
-    remaining_inds = np.arange(0, len(points), 1)
-    
-    plane_inds = np.array([]).astype(int)
-    plane_labels = np.array([]).astype(int)
-    
-    for p in range(NB_PLANES):
-        # Applying RANSAC on the current working remaining points
-        best_ref_pt, best_normal = RANSAC(points[remaining_inds,:], NB_RANDOM_DRAWS, threshold_in)
-        # Extracting the booleans telling whether remaining_inds are in the found plane
-        points_in_plane = in_plane(points[remaining_inds,:], best_ref_pt, best_normal, threshold_in)
-        # Converting to indices in the plane and outside it
-        this_plane_inds = remaining_inds[np.where(points_in_plane)[0]]
-        remaining_inds = remaining_inds[np.where(~points_in_plane)[0]] # Updating the working indices
-        
-        # Adding the plane to the found planes
-        plane_inds = np.hstack((plane_inds, this_plane_inds))
-        plane_labels = np.hstack((plane_labels, p * np.ones(len(this_plane_inds))))
-        
-    return plane_inds, remaining_inds, plane_labels
