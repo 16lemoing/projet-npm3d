@@ -6,6 +6,12 @@ Le traitement automatisé de nuages de points en trois dimensions présente un d
 La méthode proposée dans l\'article [1] propose d\'agréger les données 3D en voxels sur lesquels sera ensuite effectué le traitement de classification.
 Le but de ce projet est de mettre en œuvre, d\'analyser et de proposer une approche critique de cette méthode pour la mettre en contexte avec les données et les réalités applicatives.
 
+## Rapport
+Le rapport du projet est disponible [ici](blob/master/docs/rapport-09042020.pdf).
+
+## License
+Le code source de ce projet est distribué sous licence MIT. Consultez le fichier LICENSE pour plus d'informations.
+
 ## Références
 
 [1] Segmentation Based Classification of 3D Urban Point Clouds: A Super-Voxel Based Approach with Evaluation, Ahmad Kamal Aijazi, Paul Checchin, and Laurent Trassoudaine. Remote Sensing 2013
