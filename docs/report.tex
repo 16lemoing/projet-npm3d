@@ -152,7 +152,10 @@ Soit $A, B \in \mathcal{Z}$ deux voxels et $c_D > 0$. On dit que $A$ et $B$ sont
 
 On remarque immédiatement que cette relation est symétrique : $A \sim_{c_D} B \Leftrightarrow B \sim_{c_D} A$. On peut alors en munir notre ensemble $\mathcal{Z}$ d'arêtes pour former un graphe non-orienté dont on détermine ensuite les composantes connexes.
 
+\newpage
+
 \paragraph*{Interprétation des conditions}
+
 \begin{itemize}
 \item Condition (\ref{cond1}) : les centres des deux voxels doivent être séparés d'au plus la moyenne des tailles des deux voxels, plus un facteur correctif $c_D$ permettant d'élargir la taille des voisinages (par exemple en cas de de nuage peu dense). Ainsi, à distance inter-centre constante, $A$ et $B$ seront voisins s'ils sont suffisamment gros. S'ils sont peu étendus dans la direction de la droite reliant les centres, on retiendra l'hypothèse qu'ils ne sont pas voisins.
 \item Condition (\ref{cond2}) : la différence de couleur doit être inférieure à trois fois le plus grand écart-type. Ainsi, si une zone a une forte variabilité colorimétrique (écart-type grand), la condition sera plus permissive que si les points sont tous strictement de la même couleur.
