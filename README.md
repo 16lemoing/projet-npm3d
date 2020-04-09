@@ -7,7 +7,7 @@ La méthode proposée dans l\'article [1] propose d\'agréger les données 3D en
 Le but de ce projet est de mettre en œuvre, d\'analyser et de proposer une approche critique de cette méthode pour la mettre en contexte avec les données et les réalités applicatives.
 
 ## Rapport
-Le rapport du projet est disponible [ici](blob/master/docs/rapport-09042020.pdf).
+Le rapport du projet est disponible [ici](docs/rapport-09042020.pdf).
 
 ## License
 Le code source de ce projet est distribué sous licence MIT. Consultez le fichier LICENSE pour plus d'informations.
