@@ -50,15 +50,13 @@ for ply_file in original_clouds_folder.glob("*.ply"):
 # %% Extract and backup voxel clouds
 
 # Parameters
-relabeled_clouds_folder = "../data/relabeled_clouds"
-vc_backup_folder = "../data/backup/voxel_cloud"
+relabeled_clouds_folder = Path("..") / "data" / "relabeled_clouds"
+vc_backup_folder = Path("..") / "data" / "backup" / "voxel_cloud"
 overwrite = False
 max_voxel_size = 0.3
 threshold_grow = 2
 min_voxel_length = 5
 method = "regular"
-use_color = True
-use_reflectance = True
 
 if not vc_backup_folder.exists():
     vc_backup_folder.mkdir()
@@ -71,8 +69,8 @@ for ply_file in relabeled_clouds_folder.glob("*.ply"):
         # Retrieve data
         data = read_ply(str(ply_file))
         cloud = np.vstack((data['x'], data['y'], data['z'])).T
-        rgb_colors = np.vstack((data['red'], data['green'], data['blue'])).T if use_color else None
-        dlaser = data['reflectance'] if use_reflectance else None
+        rgb_colors = np.vstack((data['red'], data['green'], data['blue'])).T
+        dlaser = data['reflectance']
         label = data['label'] if "label" in data.dtype.names else None
         
         # Define clouds
@@ -91,15 +89,25 @@ vc_backup_folder = Path("..") / "data" / "backup" / "voxel_cloud"
 cc_backup_folder = Path("..") / "data" / "backup" / "component_cloud"
 overwrite = False
 c_D = 0.25
-segment_out_ground = False
-threshold_in = 1 # for ground detection
+segment_out_ground = True
+threshold_in = 0.7 # for ground detection
 threshold_normals = 0.8 # for ground detection
 min_component_length = 5
-use_neighbourhood_classifier = False
+use_neighbourhood_classifier = True
 train_vc_files_for_classifier = ["domfountain1.pkl", "untermaederbrunnen1.pkl"]
 classifier_type = 'random_forest' #'SGD'
 classifier_kwargs = {'n_estimators': 20} #{}
 scale_data = True
+use_color = True
+use_reflectance = True
+method = "normal"
+K = 500
+
+def filter_data(vc, use_color, use_reflectance):
+    if not use_color:
+        vc.pointcloud.rgb_colors = None
+    if not use_reflectance:
+        vc.pointcloud.laser_intensity = None
 
 if not cc_backup_folder.exists():
     cc_backup_folder.mkdir()
@@ -114,6 +122,7 @@ if use_neighbourhood_classifier:
         pkl_file = vc_backup_folder / filename
         with open(pkl_file, 'rb') as handle:
             vc = pickle.load(handle)
+            filter_data(vc, use_color, use_reflectance)
             train_vc.append(vc)
 
     # Declare classifier
@@ -135,19 +144,20 @@ for pkl_file in vc_backup_folder.glob("*.pkl"):
         # Retrieve voxel cloud
         with open(pkl_file, 'rb') as handle:
             vc = pickle.load(handle)
+            filter_data(vc, use_color, use_reflectance)
         
         # Assign trained neighbourhood classifier to voxel cloud
         # If 'neighbourhood_classifier' is None, standard neighbourhood criteria (from paper) will be applied
         vc.set_neighbourhood_classifier(neighbourhood_classifier)
         
         # Compute component cloud
-        cc = ComponentCloud(vc, c_D = c_D, segment_out_ground = segment_out_ground, threshold_in = threshold_in, threshold_normals = threshold_normals, min_component_length = min_component_length)
+        cc = ComponentCloud(vc, c_D = c_D, method = method, K = K, segment_out_ground = segment_out_ground, threshold_in = threshold_in, threshold_normals = threshold_normals, min_component_length = min_component_length)
         
         # Save component cloud
         with open(backup_file, 'wb') as handle:
             pickle.dump(cc, handle, protocol=pickle.HIGHEST_PROTOCOL)
         print(f"Done making component cloud for: {pkl_file}\n")
-
+        
 # %% Classify components
 
 # Parameters
@@ -161,7 +171,7 @@ classes = {2: "terrain", 3: "high vegetation", 4: "low vegetation", 5: "building
 classifier_type = 'random_forest'
 classifier_kwargs = {'n_estimators': 20}
 scale_data = False
-id_experimentation = 3
+id_experimentation = 5
 
 if not pc_backup_folder.exists():
     pc_backup_folder.mkdir()
@@ -239,7 +249,7 @@ plot_confusion_matrix(cm, list(classes.values()), data_type = 'extra_test', id =
 # Save train results (predicted components, predicted labels, groundtruth labels)
 print("Saving train results")
 for i, cc in enumerate(train_cc):
-    ply_file = os.path.join(pc_backup_folder, 'train_' + train_cc_files[i]).replace('pkl', 'ply')
+    ply_file = pc_backup_folder / ('train_' + train_cc_files[i].replace('pkl', 'ply'))
     cloud_point = np.vstack([cc.voxelcloud.features["geometric_center"][c] for c in cc.components])
     component = np.hstack([random.random() * np.ones(len(c)) for c in cc.components])
     predicted_label = np.hstack([cc.predicted_label[i] * np.ones(len(c)) for i, c in enumerate(cc.components)])
@@ -251,7 +261,7 @@ for i, cc in enumerate(train_cc):
 # Save test results (predicted components, predicted labels, groundtruth labels)
 print("Saving test results")
 for i, cc in enumerate(test_cc):
-    ply_file = os.path.join(pc_backup_folder, 'test_' + test_cc_files[i]).replace('pkl', 'ply')
+    ply_file = pc_backup_folder / ('test_' + test_cc_files[i].replace('pkl', 'ply'))
     cloud_point = np.vstack([cc.voxelcloud.features["geometric_center"][c] for c in cc.components])
     component = np.hstack([random.random() * np.ones(len(c)) for c in cc.components])
     predicted_label = np.hstack([cc.predicted_label[i] * np.ones(len(c)) for i, c in enumerate(cc.components)])
@@ -263,7 +273,7 @@ for i, cc in enumerate(test_cc):
 # Save extra test results (predicted components, predicted labels, groundtruth labels)
 print("Saving extra test results")
 for i, cc in enumerate(extra_test_cc):
-    ply_file = os.path.join(pc_backup_folder, 'test_' + extra_test_cc_files[i]).replace('pkl', 'ply')
+    ply_file = pc_backup_folder / ('test_' + extra_test_cc_files[i].replace('pkl', 'ply'))
     cloud_point = np.vstack([cc.voxelcloud.features["geometric_center"][c] for c in cc.components])
     component = np.hstack([random.random() * np.ones(len(c)) for c in cc.components])
     predicted_label = np.hstack([cc.predicted_label[i] * np.ones(len(c)) for i, c in enumerate(cc.components)])
